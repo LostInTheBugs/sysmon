@@ -24,6 +24,10 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 | macOS    | 🔜 Build from a Mac (dmg) |
 | Linux    | ✅ AppImage + deb |
 
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md): logging system (local + master), remote slave configuration, configurable master/slave communication direction (push/pull/both), slave updates (via master or GitHub), display themes, i18n.
+
 ## Installation
 
 ```bash
