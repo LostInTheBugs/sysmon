@@ -14,6 +14,24 @@ let reconnectTimer = null;
 let getSnapshot = null;
 let discoveredMaster = null;
 let statusListeners = [];
+let discovering = false;
+
+// Broadcasts de sous-réseau (multi-interfaces, plus fiable que 255.255.255.255 seul)
+function subnetBroadcasts() {
+  const addrs = [];
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const i of ifaces[name] || []) {
+      if (i.family === 'IPv4' && !i.internal) {
+        const ip = i.address.split('.').map(Number);
+        const mask = (i.netmask || '255.255.255.0').split('.').map(Number);
+        addrs.push(ip.map((o, n) => (o | (~mask[n] & 255))).join('.'));
+      }
+    }
+  }
+  addrs.push('255.255.255.255');
+  return [...new Set(addrs)];
+}
 
 function broadcastDiscovery() {
   return new Promise(resolve => {
@@ -32,10 +50,11 @@ function broadcastDiscovery() {
     });
     sock.bind(() => {
       sock.setBroadcast(true);
-      sock.send(payload, 0, payload.length, cfg.discoveryPort, '255.255.255.255', () => {
-        // timeout de découverte : 2s puis abandon
-        setTimeout(() => { try { sock.close(); } catch {} resolve(null); }, 2000);
-      });
+      for (const target of subnetBroadcasts()) {
+        sock.send(payload, 0, payload.length, cfg.discoveryPort, target);
+      }
+      // timeout de découverte : 2.5s puis abandon
+      setTimeout(() => { try { sock.close(); } catch {} resolve(null); }, 2500);
     });
   });
 }
@@ -49,7 +68,15 @@ function connect() {
   const target = cfg.masterIp || (discoveredMaster ? discoveredMaster.ip : null);
   if (!target) {
     notifyStatus('no-master');
-    scheduleReconnect();
+    // Le master a pu démarrer (ou le broadcast se perdre) → on re-découvre à chaque cycle
+    (async () => {
+      if (discovering) return;
+      discovering = true;
+      try {
+        const m = await broadcastDiscovery();
+        if (m) { discoveredMaster = m; connect(); }
+      } finally { discovering = false; }
+    })();
     return;
   }
   const port = discoveredMaster && !cfg.masterIp ? discoveredMaster.port : cfg.port;
@@ -84,6 +111,10 @@ function connect() {
           // Arrêt propre : le master ne veut pas de nous
           disconnect();
         }
+      } else if (msg.type === 'status') {
+        // Le master a changé notre statut (validation manuelle / rejet)
+        notifyStatus('validated', { status: msg.status, id: msg.id });
+        if (msg.status === 'rejected') disconnect();
       }
     } catch { /* ignore */ }
   });

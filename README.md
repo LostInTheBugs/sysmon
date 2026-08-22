@@ -24,6 +24,18 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 | macOS    | 🔜 Build from a Mac (dmg) |
 | Linux    | ✅ AppImage + deb |
 
+## Troubleshooting
+
+### Master/slave: the slave does not appear on the master
+
+1. On Windows, allow the ports **8597 (TCP)** and **8598 (UDP)** inbound on the master machine (Windows Firewall usually blocks them for unsigned apps):
+   ```
+   netsh advfirewall firewall add rule name="SysMon master" dir=in action=allow protocol=TCP localport=8597
+   netsh advfirewall firewall add rule name="SysMon discovery" dir=in action=allow protocol=UDP localport=8598
+   ```
+2. Or set the master's IP directly in the slave's settings (Slave mode → Master IP) — this bypasses broadcast discovery entirely.
+3. The slave retries discovery every 10 s, so no restart is needed once the master is reachable.
+
 ## Roadmap
 
 See [docs/ROADMAP.md](docs/ROADMAP.md): logging system (local + master), remote slave configuration, configurable master/slave communication direction (push/pull/both), slave updates (via master or GitHub), display themes, i18n.

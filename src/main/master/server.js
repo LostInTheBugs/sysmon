@@ -53,6 +53,14 @@ function setSlaveStatus(id, status) {
   saveSlaves();
   broadcastSlaves();
   if (onSlavesChange) onSlavesChange();
+  // Informer le slave de son nouveau statut (validation manuelle, rejet)
+  if (wss) {
+    for (const ws of wss.clients) {
+      if (ws.slaveId === id) {
+        try { ws.send(JSON.stringify({ type: 'status', status, id })); } catch { /* ignore */ }
+      }
+    }
+  }
   return true;
 }
 

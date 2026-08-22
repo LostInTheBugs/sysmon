@@ -8,6 +8,7 @@ const MODULE_LABELS = {
 };
 
 let config = null;
+let lastSlavesSig = '';
 const $ = sel => document.querySelector(sel);
 
 async function load() {
@@ -50,8 +51,11 @@ async function refreshSlaves() {
     return;
   }
   const list = await window.sysmon.listSlaves();
+  const sig = JSON.stringify(list.map(s => [s.id, s.status, s.connected, s.ip]));
+  if (sig === lastSlavesSig) return; // rien de changé → on ne réécrit pas le DOM
+  lastSlavesSig = sig;
   if (!list.length) {
-    box.innerHTML = '<div class="hint">Aucun esclave pour le moment — démarrez SysMon en mode esclave sur une autre machine.</div>';
+    box.innerHTML = '<div class="hint">Aucun esclave pour le moment — démarrez SysMon en mode esclave sur une autre machine.<br>Astuce : si rien n\'apparaît, autorisez les ports <b>8597 TCP</b> et <b>8598 UDP</b> dans le pare-feu Windows du maître.</div>';
     return;
   }
   box.innerHTML = '';
@@ -106,3 +110,5 @@ $('#save').addEventListener('click', async () => {
 });
 
 load();
+// Rafraîchissement automatique de la liste des esclaves (le master peut les voir arriver en direct)
+setInterval(() => { if (document.visibilityState === 'visible') refreshSlaves(); }, 3000);
