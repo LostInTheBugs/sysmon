@@ -156,6 +156,9 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWidgetWindow();
   });
 
+  // --- mode debug : --open-settings ouvre les paramètres (pour capture/CDP) --
+  if (process.argv.includes('--open-settings')) openSettings();
+
   // --- mode debug : --screenshot=/path.png → capture le widget puis quitte ---
   const shotArg = process.argv.find(a => a.startsWith('--screenshot='));
   if (shotArg) {
