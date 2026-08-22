@@ -62,12 +62,12 @@ async function wan() {
 async function collect() {
   try {
     const [stats, ifaces, defGw, wanData] = await Promise.all([
-      si.networkStats(),
-      staticIfaces ? Promise.resolve(staticIfaces) : si.networkInterfaces().then(i => { staticIfaces = i; return i; }),
-      si.networkGatewayDefault(),
+      si.networkStats().catch(() => []),
+      staticIfaces ? Promise.resolve(staticIfaces) : si.networkInterfaces().then(i => { staticIfaces = i; return i; }).catch(() => []),
+      si.networkGatewayDefault().catch(() => null),
       wan()
     ]);
-    const ifaceList = ifaces
+    const ifaceList = (ifaces || [])
       .filter(i => !i.internal && !i.virtual && (i.ip4 || i.ip6))
       .map(i => {
         const s = (stats || []).find(x => x.iface === i.iface);

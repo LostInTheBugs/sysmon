@@ -20,6 +20,15 @@ const pkg = require('../../package.json');
 // userData stable et cohérent sur les 3 OS (productName mettrait une majuscule)
 app.setPath('userData', path.join(app.getPath('appData'), 'sysmon'));
 
+// --- logger fichier (debug) --------------------------------------------------
+const DEBUG_LOG = path.join(app.getPath('userData'), 'sysmon-debug.log');
+function dlog(...args) {
+  try {
+    fs.mkdirSync(path.dirname(DEBUG_LOG), { recursive: true });
+    fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${args.join(' ')}\n`);
+  } catch { /* ignore */ }
+}
+
 // ---------------------------------------------------------------- fenêtres --
 function createWidgetWindow() {
   const cfg = config.load();
@@ -40,6 +49,7 @@ function createWidgetWindow() {
     }
   });
   widgetWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  widgetWin.webContents.on('console-message', (_e, _level, message) => dlog('[renderer]', message));
   widgetWin.on('closed', () => { widgetWin = null; });
 }
 
@@ -133,6 +143,7 @@ app.whenReady().then(() => {
   const cfg = config.load();
   collectors.start(snap => {
     latestSnapshot = snap;
+    dlog('snapshot emitted', snap.timestamp, 'modules:', Object.keys(snap.modules).join(','));
     if (widgetWin && !widgetWin.isDestroyed()) {
       widgetWin.webContents.send('snapshot', snap);
     }
@@ -149,6 +160,8 @@ app.whenReady().then(() => {
   const shotArg = process.argv.find(a => a.startsWith('--screenshot='));
   if (shotArg) {
     const outPath = shotArg.split('=')[1];
+    const delayArg = process.argv.find(a => a.startsWith('--screenshot-delay='));
+    const delay = delayArg ? parseInt(delayArg.split('=')[1], 10) : 8000;
     setTimeout(async () => {
       try {
         if (widgetWin && !widgetWin.isDestroyed()) {

@@ -8,6 +8,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 let config = { modules: {}, mode: 'standalone' };
 
 async function init() {
+  content.innerHTML = '<div class="loading">Collecting system info…</div>';
   config = await window.sysmon.getConfig();
   $('#mode-badge').textContent = config.mode;
   $('#mode-badge').className = config.mode;
@@ -63,7 +64,8 @@ function memorySection(m) {
 function disksSection(m) {
   if (!m || !m.ok) return section('Disks', 'unavailable', row('status', 'n/a'));
   const rows = m.filesystems.map(f => row(`${f.mount}`, `${f.usedGB} GB / ${f.totalGB} GB (${f.usePct}%)`, f.usePct > 90 ? 'bad' : f.usePct > 75 ? 'warn' : '')).join('');
-  return section('Disks', `I/O ↓${m.io.rxMBs} ↑${m.io.wxMBs} MB/s`, rows);
+  const io = m.io ? `I/O ↓${m.io.rxMBs} ↑${m.io.wxMBs} MB/s` : '';
+  return section('Disks', io, rows);
 }
 
 function batterySection(m) {
@@ -138,22 +140,28 @@ function llmSection(m) {
 
 // --- rendu -------------------------------------------------------------------
 function render(snap) {
-  const m = snap.modules || {};
-  $('#hostname').textContent = snap.host ? snap.host.hostname : '';
-  const u = snap.host ? snap.host.uptime : 0;
-  $('#uptime').textContent = u > 0 ? `up ${Math.floor(u / 3600)}h${String(Math.floor(u % 3600 / 60)).padStart(2, '0')}` : '';
-  const mods = config.modules || {};
-  let html = '';
-  if (mods.cpu) html += cpuSection(m.cpu);
-  if (mods.memory) html += memorySection(m.memory);
-  if (mods.gpu) html += gpuSection(m.gpu);
-  if (mods.disks) html += disksSection(m.disks);
-  if (mods.battery) html += batterySection(m.battery);
-  if (mods.network) html += networkSection(m.network);
-  if (mods.sensors) html += sensorsSection(m.sensors);
-  if (mods.connectivity) html += connectivitySection(m.connectivity);
-  if (mods.llm) html += llmSection(m.llm);
-  content.innerHTML = html;
+  try {
+    const m = snap.modules || {};
+    $('#hostname').textContent = snap.host ? snap.host.hostname : '';
+    const u = snap.host ? snap.host.uptime : 0;
+    $('#uptime').textContent = u > 0 ? `up ${Math.floor(u / 3600)}h${String(Math.floor(u % 3600 / 60)).padStart(2, '0')}` : '';
+    const mods = config.modules || {};
+    let html = '';
+    if (mods.cpu) html += cpuSection(m.cpu);
+    if (mods.memory) html += memorySection(m.memory);
+    if (mods.gpu) html += gpuSection(m.gpu);
+    if (mods.disks) html += disksSection(m.disks);
+    if (mods.battery) html += batterySection(m.battery);
+    if (mods.network) html += networkSection(m.network);
+    if (mods.sensors) html += sensorsSection(m.sensors);
+    if (mods.connectivity) html += connectivitySection(m.connectivity);
+    if (mods.llm) html += llmSection(m.llm);
+    content.innerHTML = html || '<div class="loading">No modules enabled…</div>';
+    console.log('[renderer] render ok, snapshot', new Date(snap.timestamp).toISOString());
+  } catch (e) {
+    console.error('[renderer] render error:', e);
+    content.innerHTML = '<div class="loading">Render error: ' + esc(e.message) + '</div>';
+  }
 }
 
 init();

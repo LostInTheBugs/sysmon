@@ -19,9 +19,9 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 
 | Platform | Status |
 |----------|--------|
-| Windows  | Planned |
-| macOS    | Planned |
-| Linux    | Planned |
+| Windows  | ✅ Installer (NSIS) + portable exe |
+| macOS    | 🔜 Build from a Mac (dmg) |
+| Linux    | ✅ AppImage + deb |
 
 ## Installation
 

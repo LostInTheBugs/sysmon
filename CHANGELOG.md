@@ -13,3 +13,12 @@ All notable changes to SysMon are documented in this file.
 - Slave mode: UDP broadcast discovery or direct master IP, WebSocket push of snapshots
 - Settings window (mode, port, master IP, auto-approve, module toggles, slave management)
 - Headless test scripts (`scripts/test-collectors.js`, `scripts/test-master-slave.js`)
+- Installable builds: Windows (NSIS installer + portable), Linux (AppImage + deb) via electron-builder
+- App icon (radar design) and widget loading placeholder
+- File-based debug logging (user-data folder)
+
+### Fixed
+- Collectors resilience: per-subcall error isolation (one failing probe no longer drops the whole module)
+- Module timeout (8s) so a hanging probe never blocks the snapshot pipeline
+- Renderer crash on null disk I/O data (`io: null`) — widget now degrades gracefully
+- CPU speed display when the OS reports 0 GHz

@@ -47,7 +47,7 @@ function hostCard(name, h, online) {
     for (const f of disks.filesystems) {
       html += row(f.mount, `${f.usedGB} / ${f.totalGB} GB (${f.usePct}%)`, f.usePct > 90 ? 'bad' : f.usePct > 75 ? 'warn' : '') + bar(f.usePct);
     }
-    html += row('I/O', `↓${disks.io.rxMBs} ↑${disks.io.wxMBs} MB/s`);
+    if (disks.io) html += row('I/O', `↓${disks.io.rxMBs} ↑${disks.io.wxMBs} MB/s`);
   }
   const bat = m.battery;
   if (bat && bat.ok && bat.present) {
