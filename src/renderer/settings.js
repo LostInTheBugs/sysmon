@@ -1,32 +1,34 @@
 'use strict';
-// Fenêtre de réglages SysMon.
+// Fenêtre de paramètres SysMon (refonte — FR, cartes, toggles).
 
 const MODULE_LABELS = {
-  cpu: 'CPU', memory: 'Memory', disks: 'Disks', battery: 'Battery',
-  network: 'Network', connectivity: 'Devices (BT/USB)', sensors: 'Sensors',
-  gpu: 'GPU', llm: 'LLM'
+  cpu: 'CPU', memory: 'Mémoire', disks: 'Disques', battery: 'Batterie',
+  network: 'Réseau', connectivity: 'Périphériques (BT/USB)', sensors: 'Sondes',
+  gpu: 'GPU', llm: 'LLM (serveurs locaux)', vms: 'Virtualisation / Docker'
 };
 
 let config = null;
-
 const $ = sel => document.querySelector(sel);
 
 async function load() {
   config = await window.sysmon.getConfig();
-  $('#mode').value = config.mode;
-  $('#webAccess').checked = !!config.webAccess;
-  $('#autoApproveSlaves').checked = !!config.autoApproveSlaves;
-  $('#port').value = config.port;
-  $('#masterIp').value = config.masterIp || '';
-  updateModeUI();
+  updateModeUI(config.mode);
   renderModules();
   refreshSlaves();
+  $('#port').value = config.port;
+  $('#webAccess').checked = !!config.webAccess;
+  $('#autoApproveSlaves').checked = !!config.autoApproveSlaves;
+  $('#masterIp').value = config.masterIp || '';
 }
 
-function updateModeUI() {
-  const mode = $('#mode').value;
-  $('#master-options').style.display = mode === 'master' ? 'block' : 'none';
-  $('#slave-options').style.display = mode === 'slave' ? 'block' : 'none';
+function updateModeUI(mode) {
+  $('#mode-badge').textContent = mode;
+  $('#mode-badge').className = 'badge ' + mode;
+  document.querySelectorAll('.mode').forEach(el => {
+    el.classList.toggle('active', el.dataset.mode === mode);
+  });
+  $('#master-card').style.display = mode === 'master' ? 'block' : 'none';
+  $('#slave-card').style.display = mode === 'slave' ? 'block' : 'none';
 }
 
 function renderModules() {
@@ -34,21 +36,22 @@ function renderModules() {
   box.innerHTML = '';
   for (const [key, label] of Object.entries(MODULE_LABELS)) {
     const div = document.createElement('div');
-    div.className = 'check';
-    div.innerHTML = `<span>${label}</span><input type="checkbox" data-module="${key}" ${config.modules[key] ? 'checked' : ''} />`;
+    div.className = 'mod';
+    div.innerHTML = `<span>${label}</span>
+      <span class="switch"><input type="checkbox" data-module="${key}" ${config.modules[key] ? 'checked' : ''} /><span class="sl"></span></span>`;
     box.appendChild(div);
   }
 }
 
 async function refreshSlaves() {
   const box = $('#slaves');
-  if ($('#mode').value !== 'master') {
-    box.innerHTML = '<div class="hint">Only visible in master mode.</div>';
+  if ($('#mode-badge').textContent !== 'master') {
+    box.innerHTML = '<div class="hint">Visible uniquement en mode maître.</div>';
     return;
   }
   const list = await window.sysmon.listSlaves();
   if (!list.length) {
-    box.innerHTML = '<div class="hint">No slaves yet — start SysMon in slave mode on another machine.</div>';
+    box.innerHTML = '<div class="hint">Aucun esclave pour le moment — démarrez SysMon en mode esclave sur une autre machine.</div>';
     return;
   }
   box.innerHTML = '';
@@ -58,13 +61,13 @@ async function refreshSlaves() {
     div.innerHTML = `
       <div>
         <div class="name">${s.name}</div>
-        <div class="meta">${s.hostname} · ${s.platform} · ${s.ip}${s.connected ? ' · online' : ' · offline'}</div>
+        <div class="meta">${s.hostname} · ${s.platform} · ${s.ip}${s.connected ? ' · en ligne' : ' · hors ligne'}</div>
       </div>
-      <span class="badge ${s.status}">${s.status}</span>
+      <span class="st ${s.status}">${s.status === 'approved' ? 'validé' : s.status === 'pending' ? 'en attente' : 'refusé'}</span>
       <div class="actions">
-        ${s.status !== 'approved' ? `<button data-act="approve" data-id="${s.id}">Approve</button>` : ''}
-        ${s.status !== 'rejected' ? `<button data-act="reject" data-id="${s.id}">Reject</button>` : ''}
-        <button data-act="remove" data-id="${s.id}">Remove</button>
+        ${s.status !== 'approved' ? `<button class="mini" data-act="approve" data-id="${s.id}">Valider</button>` : ''}
+        ${s.status !== 'rejected' ? `<button class="mini" data-act="reject" data-id="${s.id}">Refuser</button>` : ''}
+        <button class="mini" data-act="remove" data-id="${s.id}">Suppr.</button>
       </div>`;
     div.querySelectorAll('button[data-act]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -76,14 +79,17 @@ async function refreshSlaves() {
   }
 }
 
-$('#mode').addEventListener('change', updateModeUI);
+document.querySelectorAll('.mode').forEach(el => {
+  el.addEventListener('click', () => updateModeUI(el.dataset.mode));
+});
+$('#close').addEventListener('click', () => window.close());
 $('#save').addEventListener('click', async () => {
   const status = $('#status');
   try {
     const modules = {};
     document.querySelectorAll('input[data-module]').forEach(cb => { modules[cb.dataset.module] = cb.checked; });
     config = await window.sysmon.setConfig({
-      mode: $('#mode').value,
+      mode: $('#mode-badge').textContent,
       webAccess: $('#webAccess').checked,
       autoApproveSlaves: $('#autoApproveSlaves').checked,
       port: parseInt($('#port').value, 10) || 8597,
@@ -91,11 +97,11 @@ $('#save').addEventListener('click', async () => {
       modules
     });
     status.className = 'status ok';
-    status.textContent = 'Saved and applied.';
+    status.textContent = '✔ Enregistré et appliqué.';
     refreshSlaves();
   } catch (e) {
     status.className = 'status err';
-    status.textContent = 'Error: ' + e.message;
+    status.textContent = 'Erreur : ' + e.message;
   }
 });
 

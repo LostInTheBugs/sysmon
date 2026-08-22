@@ -19,7 +19,7 @@ const DEFAULTS = {
   },
   modules: {
     cpu: true, memory: true, disks: true, battery: true, network: true,
-    connectivity: true, sensors: true, gpu: true, llm: true
+    connectivity: true, sensors: true, gpu: true, llm: true, vms: true
   }
 };
 

@@ -30,6 +30,13 @@ function section(title, hint, body) {
   return `<div class="section"><h3>${esc(title)}${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</h3>${body}</div>`;
 }
 function tempCls(t) { return t == null ? '' : t > 80 ? 'bad' : t > 65 ? 'warn' : 'good'; }
+function fmtBytes(b) {
+  if (b == null) return '—';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0, v = b;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' ' + u[i];
+}
 
 // --- sections ----------------------------------------------------------------
 function cpuSection(m) {
@@ -138,6 +145,30 @@ function llmSection(m) {
   `)).join('');
 }
 
+function vmsSection(m) {
+  if (!m || !m.ok) return section('Virtualization', 'unavailable', row('status', 'n/a'));
+  const d = m.docker;
+  const dockerRows = d && d.present && d.containers.length
+    ? d.containers.map(c => row(c.name,
+        `${c.cpu != null ? 'CPU ' + c.cpu + '%' : '—'} · ${fmtBytes(c.mem)}${c.rx != null ? ` · ↓${fmtBytes(c.rx)} ↑${fmtBytes(c.tx)}` : ''}`,
+        c.cpu != null && c.cpu > 85 ? 'bad' : '')).join('')
+    : '';
+  const vmRows = (m.vms || []).map(v => {
+    const details = [];
+    if (v.cpu != null) details.push('CPU ' + v.cpu + '%');
+    if (v.memory) details.push(fmtBytes(v.memory));
+    if (v.cpus != null) details.push(v.cpus + ' vCPU');
+    if (v.adapters != null) details.push(v.adapters + ' NIC');
+    return row(`${v.engine} · ${v.name}`, details.join(' · ') || v.state);
+  }).join('');
+  const hint = d && d.present ? `Docker ${d.version} · ${d.running}/${d.total} run` : (m.vms && m.vms.length ? m.vms.length + ' VM(s)' : '');
+  return section('Virtualization', hint, `
+    ${m.hypervisor ? row('Hypervisor', m.hypervisor + ' (guest)') : ''}
+    ${dockerRows || (!d || !d.present ? row('Docker', 'not installed') : '')}
+    ${vmRows}
+  `);
+}
+
 // --- rendu -------------------------------------------------------------------
 function render(snap) {
   try {
@@ -156,6 +187,7 @@ function render(snap) {
     if (mods.sensors) html += sensorsSection(m.sensors);
     if (mods.connectivity) html += connectivitySection(m.connectivity);
     if (mods.llm) html += llmSection(m.llm);
+    if (mods.vms) html += vmsSection(m.vms);
     content.innerHTML = html || '<div class="loading">No modules enabled…</div>';
     console.log('[renderer] render ok, snapshot', new Date(snap.timestamp).toISOString());
   } catch (e) {

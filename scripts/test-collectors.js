@@ -1,7 +1,7 @@
 'use strict';
 // Test rapide des collecteurs (sans Electron)
 const c = require('../src/main/collectors');
-const mods = { cpu: true, memory: true, disks: true, battery: true, network: true, connectivity: true, sensors: true, gpu: true, llm: true };
+const mods = { cpu: true, memory: true, disks: true, battery: true, network: true, connectivity: true, sensors: true, gpu: true, llm: true, vms: true };
 let ticks = 0;
 c.start(s => {
   ticks++;

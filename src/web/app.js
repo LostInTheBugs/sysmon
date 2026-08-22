@@ -15,6 +15,14 @@ function bar(pct) {
 }
 function modTitle(t) { return `<div class="mod-title">${esc(t)}</div>`; }
 
+function fmtBytes(b) {
+  if (b == null) return '—';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0, v = b;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' ' + u[i];
+}
+
 function hostCard(name, h, online) {
   const m = h.modules || {};
   let html = `<div class="host"><h2><span class="dot ${online ? 'on' : ''}"></span>${esc(name)}</h2>`;
@@ -69,6 +77,28 @@ function hostCard(name, h, online) {
   if (sens && sens.ok && (sens.cpuTemp != null || (sens.smart || []).length)) {
     html += modTitle('Sensors') + (sens.cpuTemp != null ? row('CPU temp', sens.cpuTemp + '°C') : '');
     for (const s of sens.smart || []) html += row('SMART ' + s.device, `${s.status || 'n/a'}${s.temperature != null ? ' · ' + s.temperature + '°C' : ''}`, s.status === 'FAILED' ? 'bad' : '');
+  }
+  const vms = m.vms;
+  if (vms && vms.ok) {
+    html += modTitle('Virtualization');
+    if (vms.hypervisor) html += row('Hypervisor', vms.hypervisor + ' (guest)');
+    const d = vms.docker;
+    if (d && d.present) {
+      html += row('Docker', `${d.version} · ${d.running}/${d.total} running`);
+      for (const c of d.containers) {
+        html += row('▸ ' + c.name, `${c.cpu != null ? 'CPU ' + c.cpu + '%' : '—'} · ${fmtBytes(c.mem)}${c.rx != null ? ` · ↓${fmtBytes(c.rx)} ↑${fmtBytes(c.tx)}` : ''}`);
+      }
+    } else {
+      html += row('Docker', 'not installed');
+    }
+    for (const v of vms.vms || []) {
+      const det = [];
+      if (v.cpu != null) det.push('CPU ' + v.cpu + '%');
+      if (v.memory) det.push(fmtBytes(v.memory));
+      if (v.cpus != null) det.push(v.cpus + ' vCPU');
+      if (v.adapters != null) det.push(v.adapters + ' NIC');
+      html += row(v.engine + ' · ' + v.name, det.join(' · ') || v.state);
+    }
   }
   const llm = m.llm;
   if (llm && llm.ok && llm.detected) {

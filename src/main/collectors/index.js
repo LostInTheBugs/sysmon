@@ -15,6 +15,7 @@ const connectivity = require('./connectivity');
 const sensors = require('./sensors');
 const gpu = require('./gpu');
 const llm = require('./llm');
+const vms = require('./vms');
 
 const DEBUG_LOG = path.join(process.env.APPDATA || path.join(os.homedir(), '.config'), 'sysmon', 'sysmon-debug.log');
 function dlog(...args) {
@@ -37,7 +38,8 @@ const MODULES = {
   battery: { collector: battery, interval: MEDIUM_MS, last: 0, data: null },
   sensors: { collector: sensors, interval: MEDIUM_MS, last: 0, data: null },
   connectivity: { collector: connectivity, interval: SLOW_MS, last: 0, data: null },
-  llm: { collector: llm, interval: SLOW_MS, last: 0, data: null }
+  llm: { collector: llm, interval: SLOW_MS, last: 0, data: null },
+  vms: { collector: vms, interval: MEDIUM_MS, last: 0, data: null }
 };
 
 let osInfo = null;

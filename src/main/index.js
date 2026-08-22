@@ -162,18 +162,20 @@ app.whenReady().then(() => {
     const outPath = shotArg.split('=')[1];
     const delayArg = process.argv.find(a => a.startsWith('--screenshot-delay='));
     const delay = delayArg ? parseInt(delayArg.split('=')[1], 10) : 8000;
+    const openSettingsToo = process.argv.includes('--open-settings');
     setTimeout(async () => {
       try {
-        if (widgetWin && !widgetWin.isDestroyed()) {
-          const img = await widgetWin.webContents.capturePage();
-          require('fs').writeFileSync(outPath, img.toPNG());
-          console.log('SCREENSHOT_SAVED ' + outPath);
-        }
+        if (openSettingsToo) openSettings();
+        await new Promise(r => setTimeout(r, openSettingsToo ? 1800 : 0));
+        const target = openSettingsToo && settingsWin && !settingsWin.isDestroyed() ? settingsWin : widgetWin;
+        const img = await target.webContents.capturePage();
+        require('fs').writeFileSync(outPath, img.toPNG());
+        console.log('SCREENSHOT_SAVED ' + outPath);
       } catch (e) {
         console.error('SCREENSHOT_FAILED', e);
       }
       app.quit();
-    }, 8000);
+    }, delay);
   }
 });
 
