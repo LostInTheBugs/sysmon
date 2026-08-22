@@ -13,6 +13,7 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 - **Sensors** — temperatures, fan speeds, disk SMART status
 - **GPU** — GPU utilization, VRAM usage, connected monitors, resolutions
 - **LLM** — if a local LLM server is detected: loaded models, status, memory consumption, running tasks
+- **Virtualization / Docker** — current hypervisor (KVM, VMware, Hyper-V, VirtualBox, QEMU), Docker engine: per-container CPU/memory/network, local VMs: Hyper-V, VMware Workstation, VirtualBox, QEMU/KVM (state, CPU, memory, NICs)
 - **Master/slave mode** — slaves scan the network or use the master's IP; the master can enable a web access and validate slaves automatically or manually (from the app or the web interface)
 
 ## Platform support

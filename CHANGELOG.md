@@ -2,6 +2,20 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.003] — 2026-08-23
+
+### Added
+- Virtualization/Docker module (`vms`): current hypervisor detection (KVM, VMware, Hyper-V, VirtualBox, QEMU — via systemd-detect-virt/DMI on Linux, WMI on Windows, sysctl on macOS)
+- Docker monitoring: version, running/total containers, per-container CPU/memory/network (rx/tx)
+- Local VM monitoring: Hyper-V (state, CPU%, memory, NICs), VMware Workstation (running VMs + memory), VirtualBox (RAM/vCPU), QEMU/KVM (name, RAM, vCPU)
+- Virtualization section in the widget and web dashboard; module toggle in settings (enabled by default)
+- Settings window redesigned (French UI): mode cards, module toggle grid, slave list, status bar; external stylesheet
+- Debug flag `--open-settings` to screenshot the settings window headlessly
+
+### Fixed
+- Settings window styling was completely broken: the CSP blocked the inline `<style>` — moved to external `settings.css`
+- `vms` module missing from default enabled modules
+
 ## [2026.08.001] — 2026-08-22
 
 ### Added
