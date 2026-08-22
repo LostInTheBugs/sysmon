@@ -2,6 +2,19 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.005] — 2026-08-23
+
+### Fixed
+- Widget scroll: the drag region (`-webkit-app-region: drag`) was swallowing the mouse wheel — content is now `no-drag` and scrolls properly
+- Settings module toggles were unclickable: the hidden checkbox had zero size (`width:0;height:0`), it now covers the whole switch
+- Master/slave discovery: broadcasts are sent to every subnet broadcast address (not only `255.255.255.255`), and the slave retries discovery every 10 s (previously tried once at startup only)
+- The master now notifies a slave live when its status changes (manual validation/rejection)
+- Slave list in settings refreshes automatically every 3 s (no need to reopen the window to see new requests)
+
+### Added
+- Broadcast discovery regression test (`scripts/test-discovery.js`)
+- Windows Firewall troubleshooting section in README (ports 8597 TCP / 8598 UDP)
+
 ## [2026.08.003] — 2026-08-23
 
 ### Added
