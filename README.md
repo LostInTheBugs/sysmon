@@ -25,12 +25,19 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 
 ## Installation
 
-*(Development build — instructions will be completed with the first release.)*
-
 ```bash
 npm install
-npm start
+npm start        # lance le widget
 ```
+
+Dev notes: `npm run start:no-sandbox` for headless/CI environments (Linux).
+
+## Usage
+
+- The widget shows live system info; click ⚙ for settings (mode, port, modules, slave validation).
+- **Master mode**: enables the web dashboard at `http://localhost:8597` (port from `PORT` or settings), plus UDP discovery on port `8598` for slaves.
+- **Slave mode**: auto-discovers the master on the LAN (UDP broadcast) or connects to `masterIp` if set.
+- Slaves are validated manually (app or web) or automatically when *auto-approve* is on.
 
 ## Configuration
 
@@ -38,16 +45,24 @@ npm start
 |----------|---------|-------------|
 | `PORT`   | `8597`  | Master web access port |
 
+All settings are also editable in the app (Settings window) and persisted in the platform user-data folder.
+
 ## Project structure
 
 ```
 sysmon/
 ├── src/
-│   ├── main/        # Main process (widget, tray, master/slave)
-│   ├── preload/     # Secure bridge between main and renderer
-│   └── renderer/    # Widget UI
+│   ├── main/           # Main process: widget window, tray, master/slave
+│   │   ├── collectors/ # System info modules (CPU, mem, disks, battery,
+│   │   │               #  network, devices, sensors, GPU, LLM)
+│   │   ├── master/     # Web server + WebSocket + slave validation
+│   │   └── slave/      # UDP discovery + WebSocket push to master
+│   ├── preload/        # Secure bridge between main and renderer
+│   ├── renderer/       # Widget UI + settings window
+│   └── web/            # Web dashboard served by the master
+├── scripts/            # Headless test scripts (collectors, master/slave)
 ├── docs/
-│   └── SPEC.md      # Full specification
+│   └── SPEC.md         # Full specification
 ├── VERSION
 ├── CHANGELOG.md
 └── README.md

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <title>SysMon — Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #16181d; color: #dbe4ee;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px; padding: 16px;
+    }
+    h1 { font-size: 15px; color: #4fc3f7; letter-spacing: 2px; margin-bottom: 14px; }
+    h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #7f8ea3; margin: 16px 0 8px; }
+    label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    label span { color: #aeb9c7; }
+    input[type=text], input[type=number], select {
+      background: #20242c; border: 1px solid #2e343f; color: #dbe4ee;
+      border-radius: 5px; padding: 5px 8px; width: 200px; font-size: 13px;
+    }
+    select { width: 200px; }
+    .check { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+    .check span { color: #aeb9c7; }
+    input[type=checkbox] { transform: scale(1.15); accent-color: #4fc3f7; }
+    button {
+      background: #20242c; border: 1px solid #2e343f; color: #dbe4ee;
+      border-radius: 5px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+    }
+    button:hover { border-color: #4fc3f7; }
+    button.primary { background: #4fc3f7; border-color: #4fc3f7; color: #0b1620; font-weight: 600; }
+    #save { margin-top: 18px; width: 100%; }
+    .status { margin-top: 10px; font-size: 12px; min-height: 16px; }
+    .status.ok { color: #5fd38a; }
+    .status.err { color: #ef6a6a; }
+    .slave { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; background: #20242c; border: 1px solid #2e343f; border-radius: 6px; margin-bottom: 6px; }
+    .slave .name { font-weight: 600; }
+    .slave .meta { color: #7f8ea3; font-size: 11px; }
+    .slave .actions { display: flex; gap: 6px; }
+    .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .badge.pending { background: rgba(242,176,77,.15); color: #f2b04d; }
+    .badge.approved { background: rgba(95,211,138,.15); color: #5fd38a; }
+    .badge.rejected { background: rgba(239,106,106,.15); color: #ef6a6a; }
+    .hint { color: #7f8ea3; font-size: 11px; margin: -4px 0 10px; }
+  </style>
+</head>
+<body>
+  <h1>SYSMON — SETTINGS</h1>
+
+  <h2>Mode</h2>
+  <label><span>Operation mode</span>
+    <select id="mode">
+      <option value="standalone">Standalone</option>
+      <option value="master">Master</option>
+      <option value="slave">Slave</option>
+    </select>
+  </label>
+  <div id="master-options" style="display:none">
+    <label><span>Web access</span><input type="checkbox" id="webAccess" /></label>
+    <label><span>Auto-approve slaves</span><input type="checkbox" id="autoApproveSlaves" /></label>
+    <label><span>Web port</span><input type="number" id="port" min="1" max="65535" /></label>
+  </div>
+  <div id="slave-options" style="display:none">
+    <label><span>Master IP (empty = auto-discovery)</span><input type="text" id="masterIp" placeholder="192.168.1.10" /></label>
+    <div class="hint">Leave empty to scan the network automatically (UDP broadcast).</div>
+  </div>
+
+  <h2>Modules</h2>
+  <div id="modules"></div>
+
+  <h2>Slaves</h2>
+  <div id="slaves"><div class="hint">Only visible in master mode.</div></div>
+
+  <button id="save" class="primary">Save &amp; Apply</button>
+  <div id="status" class="status"></div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

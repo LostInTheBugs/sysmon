@@ -1,0 +1,20 @@
+{
+  "name": "sysmon",
+  "productName": "SysMon",
+  "version": "2026.08.001",
+  "description": "SysMon — cross-platform system monitoring widget (Windows/macOS/Linux) with master/slave mode and web dashboard",
+  "main": "src/main/index.js",
+  "author": "LostInTheBugs",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "start:no-sandbox": "electron . --no-sandbox"
+  },
+  "dependencies": {
+    "systeminformation": "^5.26.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

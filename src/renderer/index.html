@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <title>SysMon</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="widget">
+    <div id="titlebar">
+      <span id="title">SYSMON</span>
+      <span id="hostname">—</span>
+      <div id="win-controls">
+        <button id="btn-settings" title="Settings">⚙</button>
+        <button id="btn-close" title="Close">✕</button>
+      </div>
+    </div>
+    <div id="content"></div>
+    <div id="footer">
+      <span id="mode-badge">standalone</span>
+      <span id="uptime"></span>
+    </div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>

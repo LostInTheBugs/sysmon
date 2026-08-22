@@ -1,0 +1,13 @@
+'use strict';
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('sysmon', {
+  onSnapshot: cb => ipcRenderer.on('snapshot', (_e, snap) => cb(snap)),
+  getConfig: () => ipcRenderer.invoke('config:get'),
+  setConfig: patch => ipcRenderer.invoke('config:set', patch),
+  listSlaves: () => ipcRenderer.invoke('slaves:list'),
+  setSlave: (id, action) => ipcRenderer.invoke('slaves:set', id, action),
+  openDashboard: () => ipcRenderer.invoke('open:dashboard'),
+  openSettings: () => ipcRenderer.invoke('open:settings'),
+  refresh: () => ipcRenderer.invoke('sysinfo:refresh')
+});

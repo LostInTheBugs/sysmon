@@ -7,3 +7,9 @@ All notable changes to SysMon are documented in this file.
 ### Added
 - Project scaffold: repository structure, README, LICENSE, VERSION, CHANGELOG
 - Full specification drafted in `docs/SPEC.md` (CPU, memory, disks, battery, network, connectivity, sensors, GPU, LLM, master/slave mode, web access)
+- Electron app skeleton: frameless transparent always-on-top widget + tray
+- System collectors via `systeminformation`: CPU (usage, load, per-core), memory (used/swap/top processes), disks (filesystems + I/O + SMART), battery (cycles, health, capacity, time remaining), network (per-interface traffic, LAN/WAN, routes, WAN IP + country detection), USB/Bluetooth, sensors (CPU temp, fans via hwmon, SMART), GPU (utilization, VRAM, displays), LLM local server detection (llama.cpp, Ollama, LM Studio, KoboldCpp)
+- Master mode: HTTP server + WebSocket, web dashboard, slave registry with automatic or manual validation (app + web)
+- Slave mode: UDP broadcast discovery or direct master IP, WebSocket push of snapshots
+- Settings window (mode, port, master IP, auto-approve, module toggles, slave management)
+- Headless test scripts (`scripts/test-collectors.js`, `scripts/test-master-slave.js`)
