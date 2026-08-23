@@ -10,12 +10,21 @@ let config = { modules: {}, mode: 'standalone' };
 async function init() {
   content.innerHTML = '<div class="loading">Collecting system info…</div>';
   config = await window.sysmon.getConfig();
+  applyTheme(config);
   $('#mode-badge').textContent = config.mode;
   $('#mode-badge').className = config.mode;
   $('#btn-settings').addEventListener('click', () => window.sysmon.openSettings());
   $('#btn-close').addEventListener('click', () => window.close());
   window.sysmon.onSnapshot(render);
+  window.sysmon.onConfig(cfg => { config = cfg; applyTheme(cfg); });
   window.sysmon.refresh();
+}
+
+// --- thème / accent (appliqué en direct depuis les paramètres) ---------------
+function applyTheme(cfg) {
+  document.body.dataset.theme = cfg.theme || 'dark';
+  document.body.classList.toggle('compact', cfg.theme === 'compact');
+  document.body.style.setProperty('--accent', cfg.accent || '#4fc3f7');
 }
 
 // --- helpers d'affichage -----------------------------------------------------

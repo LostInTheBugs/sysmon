@@ -5,8 +5,8 @@
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const config = require('./config');
+const logger = require('./logger');
 const collectors = require('./collectors');
 const masterServer = require('./master/server');
 const slaveClient = require('./slave/client');
@@ -17,17 +17,17 @@ let tray = null;
 let latestSnapshot = null;
 
 const pkg = require('../../package.json');
+const APP_ICON = path.join(__dirname, '..', '..', 'build', 'icon.png');
 
 // userData stable et cohérent sur les 3 OS (productName mettrait une majuscule)
 app.setPath('userData', path.join(app.getPath('appData'), 'sysmon'));
+// Identité Windows : icône correcte dans la barre des tâches (pas de carré vide)
+app.setAppUserModelId('com.lostinthebugs.sysmon');
 
-// --- logger fichier (debug) --------------------------------------------------
-const DEBUG_LOG = path.join(app.getPath('userData'), 'sysmon-debug.log');
+// --- logger (buffer + fichier) ----------------------------------------------
+
 function dlog(...args) {
-  try {
-    fs.mkdirSync(path.dirname(DEBUG_LOG), { recursive: true });
-    fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${args.join(' ')}\n`);
-  } catch { /* ignore */ }
+  logger.debug('main', ...args);
 }
 
 // ---------------------------------------------------------------- fenêtres --
@@ -42,6 +42,7 @@ function createWidgetWindow() {
     resizable: false,
     alwaysOnTop: cfg.widget.alwaysOnTop,
     skipTaskbar: false,
+    icon: APP_ICON,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -50,7 +51,7 @@ function createWidgetWindow() {
     }
   });
   widgetWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  widgetWin.webContents.on('console-message', (_e, _level, message) => dlog('[renderer]', message));
+  widgetWin.webContents.on('console-message', (_e, _level, message) => logger.debug('renderer', message));
   widgetWin.on('closed', () => { widgetWin = null; });
 }
 
@@ -62,6 +63,7 @@ function openSettings() {
     frame: false,          // pas de barre de titre OS (blanche) — en-tête sombre comme le widget
     resizable: false,
     autoHideMenuBar: true, // pas de menu en haut de la fenêtre paramètres
+    icon: APP_ICON,
     backgroundColor: '#16181d',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -74,9 +76,15 @@ function openSettings() {
 }
 
 function createTray() {
-  // Icône simple générée en mémoire (16x16, cercle)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#4fc3f7" stroke="#0b3d52" stroke-width="1"/><circle cx="8" cy="8" r="2.5" fill="#0b3d52"/></svg>`;
-  const img = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  // Icône réelle (build/icon.png) réduite pour le tray
+  let img = nativeImage.createFromPath(APP_ICON);
+  if (img.isEmpty()) {
+    // repli : icône simple générée en mémoire (16x16, cercle)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#4fc3f7" stroke="#0b3d52" stroke-width="1"/><circle cx="8" cy="8" r="2.5" fill="#0b3d52"/></svg>`;
+    img = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  } else {
+    img = img.resize({ width: 16, height: 16 });
+  }
   tray = new Tray(img);
   tray.setToolTip('SysMon ' + pkg.version);
   rebuildTrayMenu();
@@ -108,12 +116,12 @@ function applyMode(cfg) {
   try {
     if (cfg.mode === 'master') {
       masterServer.start({ getSnapshot: () => latestSnapshot, onChange: () => {} });
-      console.log('[sysmon] master server started on port ' + cfg.port);
+      logger.info('main', 'master server started on port', cfg.port);
     } else if (cfg.mode === 'slave') {
       slaveClient.start(() => latestSnapshot);
     }
   } catch (e) {
-    console.error('[sysmon] applyMode error:', e);
+    logger.error('main', 'applyMode error:', e);
   }
   collectors.setEnabled(cfg.modules);
   rebuildTrayMenu();
@@ -123,6 +131,10 @@ ipcMain.handle('config:get', () => config.load());
 ipcMain.handle('config:set', (_e, patch) => {
   const next = config.set(patch);
   applyMode(next);
+  // Appliquer la config en direct (thème, accent…) dans les fenêtres ouvertes
+  for (const w of [widgetWin, settingsWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send('config', next);
+  }
   return next;
 });
 ipcMain.handle('slaves:list', () => (masterServer.listSlaves ? masterServer.listSlaves() : []));

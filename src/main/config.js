@@ -11,6 +11,9 @@ const DEFAULTS = {
   autoApproveSlaves: false,
   webAccess: true,
   pushIntervalMs: 2000,
+  theme: 'dark',        // 'dark' | 'light' | 'amoled' | 'compact'
+  accent: '#4fc3f7',    // couleur d'accent (widget, paramètres, dashboard)
+  logLevel: 'debug',    // 'debug' | 'info' | 'warn' | 'error'
   widget: {
     alwaysOnTop: true,
     opacity: 0.95,

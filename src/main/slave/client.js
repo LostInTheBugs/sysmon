@@ -3,17 +3,15 @@
 // connexion WebSocket et push des snapshots.
 
 const dgram = require('dgram');
-const fs = require('fs');
 const path = require('path');
 const { WebSocket } = require('ws');
 const config = require('../config');
+const logger = require('../logger');
 const pkg = require('../../../package.json');
 const os = require('os');
 
-const DEBUG_LOG = path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
-function dlog(...args) {
-  try { fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [slave] ${args.join(' ')}\n`); } catch { /* ignore */ }
-}
+// Compat : les anciens appels dlog() passent par le logger central
+function dlog(...args) { logger.debug('slave', ...args); }
 
 let ws = null;
 let timer = null;
@@ -131,7 +129,11 @@ function connect() {
     timer = setInterval(() => {
       if (ws !== sock) return;
       const snap = getSnapshot ? getSnapshot() : null;
-      if (snap && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      if (sock.readyState !== WebSocket.OPEN) return;
+      if (snap) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      // Logs non encore envoyés → centralisés chez le master
+      const logs = logger.drain();
+      if (logs.length) sock.send(JSON.stringify({ type: 'logs', logs }));
     }, cfg.pushIntervalMs);
   });
   sock.on('message', raw => {

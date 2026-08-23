@@ -1,9 +1,73 @@
 'use strict';
 // SysMon web dashboard — se connecte en WebSocket au master,
 // affiche le master + tous les slaves approuvés, permet la validation.
+// Logs centralisés (master + slaves) via /api/logs.
 
 const hostsEl = document.getElementById('hosts');
 const connEl = document.getElementById('conn');
+const logsPanel = document.getElementById('logs-panel');
+const logsEl = document.getElementById('logs');
+const logHostSel = document.getElementById('log-host');
+const logLevelSel = document.getElementById('log-level');
+const logsCountEl = document.getElementById('logs-count');
+
+// --- thème (persisté dans localStorage, par défaut dark) ---------------------
+const THEMES = ['dark', 'light', 'amoled', 'compact'];
+function applyTheme(t) {
+  document.body.dataset.theme = t;
+  document.body.classList.toggle('compact', t === 'compact');
+  localStorage.setItem('sysmon-theme', t);
+}
+applyTheme(localStorage.getItem('sysmon-theme') || 'dark');
+document.getElementById('btn-theme').addEventListener('click', () => {
+  const cur = THEMES.indexOf(document.body.dataset.theme);
+  applyTheme(THEMES[(cur + 1) % THEMES.length]);
+});
+
+// --- logs centralisés ---------------------------------------------------------
+const logBuffer = []; // {ts, level, host, tag, msg}
+const logHosts = new Set();
+function renderLogs() {
+  const host = logHostSel.value;
+  const lvl = logLevelSel.value;
+  const LV = { debug: 10, info: 20, warn: 30, error: 40 };
+  const rows = logBuffer.filter(l => (!host || l.host === host) && LV[l.level] >= LV[lvl]);
+  logsCountEl.textContent = rows.length + ' shown';
+  if (!rows.length) {
+    logsEl.innerHTML = '<div class="logs-empty">No logs yet…</div>';
+    return;
+  }
+  logsEl.innerHTML = rows.slice(-300).map(l =>
+    `<div class="log-line"><span class="t">${esc(new Date(l.ts).toTimeString().slice(0, 8))}</span>` +
+    `<span class="h">${esc(l.host)}</span><span class="lvl ${esc(l.level)}">${esc(l.level)}</span>` +
+    `<span class="m">${esc(l.tag ? '[' + l.tag + '] ' : '')}${esc(l.msg)}</span></div>`
+  ).join('');
+}
+async function refreshLogs() {
+  try {
+    const r = await fetch('/api/logs?limit=400');
+    const data = await r.json();
+    for (const [host, entries] of Object.entries(data.hosts || {})) {
+      for (const e of entries) {
+        if (e && e.msg) logBuffer.push({ ...e, host });
+        if (host) logHosts.add(host);
+      }
+    }
+    if (logBuffer.length > 800) logBuffer.splice(0, logBuffer.length - 800);
+    // rafraîchir la liste des hôtes si elle a changé
+    const opts = ['<option value="">all hosts</option>', ...[...logHosts].sort().map(h => `<option>${esc(h)}</option>`)].join('');
+    if (logHostSel.innerHTML !== opts) logHostSel.innerHTML = opts;
+    if (!logsPanel.classList.contains('hidden')) renderLogs();
+  } catch { /* le master est peut-être en train de redémarrer */ }
+}
+document.getElementById('btn-logs').addEventListener('click', async () => {
+  logsPanel.classList.toggle('hidden');
+  document.getElementById('btn-logs').classList.toggle('active', !logsPanel.classList.contains('hidden'));
+  if (!logsPanel.classList.contains('hidden')) { await refreshLogs(); renderLogs(); }
+});
+logHostSel.addEventListener('change', renderLogs);
+logLevelSel.addEventListener('change', renderLogs);
+setInterval(() => { if (!logsPanel.classList.contains('hidden')) refreshLogs(); }, 3000);
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = v => v ?? '—';

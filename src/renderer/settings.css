@@ -4,6 +4,22 @@
   --text: #dbe4ee; --dim: #7f8ea3; --accent: #4fc3f7;
   --ok: #5fd38a; --warn: #f2b04d; --bad: #ef6a6a;
 }
+/* --- thèmes --- */
+body[data-theme="light"] {
+  --bg: #f6f8fb; --panel: #ffffff; --panel2: #eef1f6; --border: #d4dbe4;
+  --text: #1b2430; --dim: #5a6b7d; --accent: #0288d1;
+  --ok: #178a52; --warn: #c77f05; --bad: #d64545;
+}
+body[data-theme="amoled"] {
+  --bg: #000000; --panel: #0a0a0a; --panel2: #101010; --border: #1e1e1e;
+  --text: #e8eef5; --dim: #66758a; --accent: #4fc3f7;
+  --ok: #4fd68a; --warn: #f0b04d; --bad: #f06060;
+}
+body[data-theme="compact"] {
+  --bg: #0e1116; --panel: #151a21; --panel2: #11151b; --border: #252c36;
+}
+body.compact main { padding: 8px 10px; }
+body.compact .card { padding: 9px; margin-bottom: 8px; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; }
 #app { display: flex; flex-direction: column; height: 100vh; }
@@ -58,6 +74,31 @@ main::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius
 }
 .field input:focus { outline: none; border-color: var(--accent); }
 .hint { color: var(--dim); font-size: 11px; margin: 4px 0 10px; line-height: 1.5; }
+
+/* --- sélecteur de thème --- */
+.themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.theme {
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 4px;
+  text-align: center; cursor: pointer; background: var(--panel2);
+  transition: border-color .15s;
+}
+.theme:hover { border-color: #3a4350; }
+.theme.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme .sw { width: 100%; height: 26px; border-radius: 5px; border: 1px solid var(--border); }
+.theme .sw.dark { background: linear-gradient(135deg, #12161c, #2a313c); }
+.theme .sw.light { background: linear-gradient(135deg, #ffffff, #d4dbe4); }
+.theme .sw.amoled { background: linear-gradient(135deg, #000000, #1a1a1a); }
+.theme .sw.compact { background: repeating-linear-gradient(45deg, #12161c 0 4px, #1c222b 4px 8px); }
+.theme .t { font-size: 10px; margin-top: 5px; color: var(--text); }
+select {
+  background: #20242c; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 140px;
+}
+input[type="color"] {
+  width: 40px; height: 28px; border: 1px solid var(--border); border-radius: 6px;
+  background: #20242c; padding: 2px; cursor: pointer;
+}
+body[data-theme="light"] select { background: #ffffff; }
 
 .switch { position: relative; width: 36px; height: 20px; flex: 0 0 auto; }
 .switch input {

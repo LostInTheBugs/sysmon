@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
   <title>SysMon — Paramètres</title>
   <link rel="stylesheet" href="settings.css" />
 </head>
@@ -35,6 +35,31 @@
         <h2>Options de l'esclave</h2>
         <div class="field"><label>IP du maître</label><input type="text" id="masterIp" placeholder="192.168.1.10" /></div>
         <div class="hint">Laissez vide pour rechercher le maître automatiquement sur le réseau (broadcast UDP).</div>
+      </div>
+
+      <div class="card">
+        <h2>Apparence</h2>
+        <div class="themes">
+          <div class="theme" data-theme="dark"><div class="sw dark"></div><div class="t">Sombre</div></div>
+          <div class="theme" data-theme="light"><div class="sw light"></div><div class="t">Clair</div></div>
+          <div class="theme" data-theme="amoled"><div class="sw amoled"></div><div class="t">AMOLED</div></div>
+          <div class="theme" data-theme="compact"><div class="sw compact"></div><div class="t">Compact</div></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>Couleur d'accent</label><input type="color" id="accent" /></div>
+        <div class="hint">Appliqué en direct au widget, aux paramètres et au dashboard web.</div>
+      </div>
+
+      <div class="card">
+        <h2>Logs</h2>
+        <div class="field"><label>Niveau de logs</label>
+          <select id="logLevel">
+            <option value="debug">debug</option>
+            <option value="info">info</option>
+            <option value="warn">warn</option>
+            <option value="error">error</option>
+          </select>
+        </div>
+        <div class="hint">En mode esclave, les logs sont envoyés au maître et visibles dans le dashboard web (onglet Logs).</div>
       </div>
 
       <div class="card">

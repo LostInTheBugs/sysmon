@@ -11,19 +11,20 @@ const dgram = require('dgram');
 const os = require('os');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
+const logger = require('../logger');
 
 const WEB_DIR = path.join(__dirname, '..', '..', 'web');
+const MAX_HOST_LOGS = 300;
 
-const DEBUG_LOG = path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
-function dlog(...args) {
-  try { fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [master] ${args.join(' ')}\n`); } catch { /* ignore */ }
-}
+// Compat : les anciens appels dlog() passent par le logger central
+function dlog(...args) { logger.debug('master', ...args); }
 
 let server = null;
 let wss = null;
 let udpSock = null;
 let snapshotsTimer = null;
 let slaves = new Map();   // id -> { id, name, hostname, platform, version, ip, status, lastSeen, snapshot }
+let slaveLogs = new Map(); // slaveId -> [entries] (logs centralisés des slaves)
 let dashboards = new Set();
 let getSnapshot = null;
 let onSlavesChange = null;
@@ -49,6 +50,24 @@ function listSlaves() {
     version: s.version, ip: s.ip, status: s.status, lastSeen: s.lastSeen,
     connected: s.connected, snapshot: s.snapshot
   }));
+}
+
+// --- Logs centralisés --------------------------------------------------------
+function appendSlaveLogs(id, logs) {
+  let buf = slaveLogs.get(id);
+  if (!buf) { buf = []; slaveLogs.set(id, buf); }
+  for (const l of logs) if (l && l.msg) buf.push(l);
+  if (buf.length > MAX_HOST_LOGS) buf.splice(0, buf.length - MAX_HOST_LOGS);
+}
+
+function getLogs(minLevel = 'debug', limit = 200) {
+  const lv = logger.LEVELS[minLevel] != null ? logger.LEVELS[minLevel] : 10;
+  const hosts = { master: logger.getBuffer(limit, minLevel) };
+  for (const [id, buf] of slaveLogs) {
+    const s = slaves.get(id);
+    if (s) hosts[s.name] = buf.filter(e => logger.LEVELS[e.level] >= lv).slice(-limit);
+  }
+  return hosts;
 }
 
 function setSlaveStatus(id, status) {
@@ -134,6 +153,17 @@ function start({ getSnapshot: gs, onChange }) {
       res.end(JSON.stringify(listSlaves()));
       return;
     }
+    if (url.pathname === '/api/logs') {
+      // Logs centralisés : master + tous les slaves (filtres host/level/limit)
+      const level = url.searchParams.get('level') || 'debug';
+      const limit = parseInt(url.searchParams.get('limit'), 10) || 200;
+      const host = url.searchParams.get('host');
+      let hosts = getLogs(level, Math.min(limit, 500));
+      if (host) hosts = { [host]: hosts[host] || [] };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ hosts }));
+      return;
+    }
     // --- Dashboard web ---
     let file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     file = path.normalize(file).replace(/^(\.\.[\/\\])+/, '');
@@ -167,6 +197,9 @@ function start({ getSnapshot: gs, onChange }) {
           s.snapshot = msg.data;
           s.lastSeen = Date.now();
         }
+      } else if (msg.type === 'logs' && ws.slaveId) {
+        const s = slaves.get(ws.slaveId);
+        if (s && msg.logs && msg.logs.length) appendSlaveLogs(s.id, msg.logs);
       } else if (msg.type === 'subscribe') {
         dashboards.add(ws);
         ws.send(JSON.stringify({ type: 'slaves', list: listSlaves() }));
@@ -219,6 +252,7 @@ function stop() {
   if (snapshotsTimer) { clearInterval(snapshotsTimer); snapshotsTimer = null; }
   if (server) { server.close(); server = null; }
   if (udpSock) { try { udpSock.close(); } catch {} udpSock = null; }
+  slaveLogs.clear();
 }
 
-module.exports = { start, stop, listSlaves, setSlaveStatus };
+module.exports = { start, stop, listSlaves, setSlaveStatus, getLogs };

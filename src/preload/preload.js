@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('sysmon', {
   onSnapshot: cb => ipcRenderer.on('snapshot', (_e, snap) => cb(snap)),
+  onConfig: cb => ipcRenderer.on('config', (_e, cfg) => cb(cfg)),
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: patch => ipcRenderer.invoke('config:set', patch),
   listSlaves: () => ipcRenderer.invoke('slaves:list'),

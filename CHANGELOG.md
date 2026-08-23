@@ -2,6 +2,34 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.011] — 2026-08-23
+
+### Added
+- **Centralized logs**: new `logger` module (in-memory ring buffer + level filter +
+  existing `sysmon-debug.log`). Slaves stream their logs to the master
+  (incremental drain attached to the snapshot push); the master keeps a per-host
+  buffer (300 lines) and exposes it via `GET /api/logs?host=&level=&limit=`. The
+  web dashboard has a **LOGS panel** (button in the header) with host/level
+  filters, auto-refresh every 3 s. Log level configurable in settings
+  (`logLevel`: debug/info/warn/error)
+- **Themes**: 4 presets — Dark (default), Light, AMOLED, Compact — plus a
+  custom **accent color**, applied live to the widget, the settings window and
+  the web dashboard (dashboard keeps its choice in localStorage, cycle with the
+  ◐ button). Theme/accent picker in settings → Apparence card, live preview
+  before saving, config broadcast to open windows on save
+- **Real application icon**: `build/icon.ico` (7 sizes) + `icon-512.png`
+  generated from the radar SVG. Applied to both windows and the tray, and
+  `app.setAppUserModelId()` on Windows so the taskbar shows the icon instead of
+  a blank square
+
+### Fixed
+- CSP `style-src` blocked the inline accent color (`style.setProperty`) in the
+  widget and settings window — `'unsafe-inline'` added for styles only
+
+### Tests
+- `scripts/test-logs.js`: slave log → master → `/api/logs` round-trip (all 6
+  tests passing)
+
 ## [2026.08.009] — 2026-08-23
 
 ### Fixed

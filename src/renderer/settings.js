@@ -20,6 +20,20 @@ async function load() {
   $('#webAccess').checked = !!config.webAccess;
   $('#autoApproveSlaves').checked = !!config.autoApproveSlaves;
   $('#masterIp').value = config.masterIp || '';
+  $('#logLevel').value = config.logLevel || 'debug';
+  $('#accent').value = config.accent || '#4fc3f7';
+  applyTheme(config);
+}
+
+// --- thème : aperçu en direct, persisté au clic sur Enregistrer --------------
+function applyTheme(cfg) {
+  document.body.dataset.theme = cfg.theme || 'dark';
+  document.body.classList.toggle('compact', cfg.theme === 'compact');
+  document.body.style.setProperty('--accent', cfg.accent || '#4fc3f7');
+  document.querySelectorAll('.theme').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === (cfg.theme || 'dark'));
+  });
+  $('#accent').value = cfg.accent || '#4fc3f7';
 }
 
 function updateModeUI(mode) {
@@ -86,6 +100,11 @@ async function refreshSlaves() {
 document.querySelectorAll('.mode').forEach(el => {
   el.addEventListener('click', () => updateModeUI(el.dataset.mode));
 });
+// Aperçu thème/accent en direct (sans sauvegarder)
+document.querySelectorAll('.theme').forEach(el => {
+  el.addEventListener('click', () => applyTheme({ ...config, theme: el.dataset.theme }));
+});
+$('#accent').addEventListener('input', e => applyTheme({ ...config, accent: e.target.value }));
 $('#win-close').addEventListener('click', () => window.close());
 $('#close').addEventListener('click', () => window.close());
 $('#save').addEventListener('click', async () => {
@@ -99,6 +118,9 @@ $('#save').addEventListener('click', async () => {
       autoApproveSlaves: $('#autoApproveSlaves').checked,
       port: parseInt($('#port').value, 10) || 8597,
       masterIp: $('#masterIp').value.trim(),
+      theme: document.body.dataset.theme || 'dark',
+      accent: $('#accent').value,
+      logLevel: $('#logLevel').value,
       modules
     });
     status.className = 'status ok';
