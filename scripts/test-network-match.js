@@ -84,6 +84,18 @@ const macIfaces = [
 ok = ok && macIfaces.filter(isUsefulIface).length === 1 && macIfaces.filter(isUsefulIface)[0].iface === 'en0';
 console.log('mac iface filter:', ok ? 'OK' : 'FAIL', '→', macIfaces.filter(isUsefulIface).map(i => i.iface).join(','));
 
+// 10. parsing netstat -ib (macOS — vrai output du MacBook de Fred)
+const { parseNetstatIB } = require('../src/main/collectors/network');
+const macNetstat = `Name       Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
+en0        1500  <Link#13>   8e:a8:b4:50:97:96 31545196     0 43396747262  6590740     0 2393761073     0
+en0        1500  macbook-air fe80:d::14da:6a12 31545196     - 43396747262  6590740     - 2393761073     -
+utun4      1380  <Link#18>                      1234567     0  40114604411  2345678     0  1888937232     0
+awdl0      1500  <Link#14>   f2:43:86:02:df:ed        0     0          0        0     0          0     0`;
+const ib = parseNetstatIB(macNetstat);
+ok = ok && ib.length === 3 && ib[0].iface === 'en0' && ib[0].rx_bytes === 43396747262 && ib[0].tx_bytes === 2393761073
+  && ib[1].iface === 'utun4' && ib[1].rx_bytes === 40114604411 && ib[1].tx_bytes === 1888937232;
+console.log('netstat -ib parse:', ok ? 'OK' : 'FAIL', '→', ib.map(i => i.iface + ':' + i.rx_bytes).join(' '));
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);

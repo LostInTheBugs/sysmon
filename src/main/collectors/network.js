@@ -154,6 +154,37 @@ function isUsefulIface(i) {
   return !!i.ip6 && !String(i.ip6).startsWith('fe80:');
 }
 
+// --- macOS : netstat -ib direct (systeminformation est cassé sur macOS 26 :
+// si.networkStats() ne renvoie qu'une seule interface utun au lieu de toutes).
+// Format stable : lignes "<Link#N>" avec compteurs; adresse MAC absente pour
+// les tunnels → compter depuis la fin : Ibytes = len-5, Obytes = len-2.
+function parseNetstatIB(stdout) {
+  const out = [];
+  for (const line of String(stdout).split('\n')) {
+    if (!line.includes('<Link#')) continue;
+    const p = line.trim().split(/\s+/);
+    if (p.length < 9) continue;
+    out.push({
+      iface: p[0],
+      rx_bytes: parseInt(p[p.length - 5], 10) || 0,
+      tx_bytes: parseInt(p[p.length - 2], 10) || 0
+    });
+  }
+  return out;
+}
+
+async function netstatIB() {
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execP = promisify(exec);
+    const { stdout } = await execP('netstat -ib', { timeout: 5000 });
+    return parseNetstatIB(stdout);
+  } catch {
+    return null;
+  }
+}
+
 async function collect() {
   try {
     const [stats0, ifaces, defGw, wanData] = await Promise.all([
@@ -162,10 +193,21 @@ async function collect() {
       si.networkGatewayDefault().catch(() => null),
       wan()
     ]);
-    // Windows : si tous les compteurs sont à 0 (perfmon cassé), repli sur
-    // Get-NetAdapterStatistics
+    // Source des stats par plateforme :
+    // - darwin : netstat -ib direct (si.networkStats cassé sur macOS 26)
+    // - win32  : si.networkStats, avec repli Get-NetAdapterStatistics si 0
+    // - linux  : si.networkStats
     let stats = stats0 || [];
-    if (process.platform === 'win32' && stats.length && stats.every(s => !s.rx_bytes)) {
+    if (process.platform === 'darwin') {
+      const ib = await netstatIB();
+      if (ib && ib.length) {
+        stats = ib;
+        try {
+          const logger = require('../logger');
+          logger.debug('network', 'netstat -ib direct source:', ib.length, 'interface(s)');
+        } catch { /* logger pas dispo (test) */ }
+      }
+    } else if (process.platform === 'win32' && stats.length && stats.every(s => !s.rx_bytes)) {
       const as = await windowsAdapterStats();
       if (as && as.length) {
         stats = as;
@@ -205,6 +247,9 @@ async function collect() {
           isDefault: defGw && defGw.iface === i.iface
         };
       });
+    // Les tunnels (utun/tap/tun) ne s'affichent que s'ils transportent du
+    // trafic réel (VPN actif) — sinon on ne montre que les vraies interfaces.
+    const visible = ifaceList.filter(i => !/^(utun|tap|tun)\d*$/i.test(i.iface) || i.rxMBs > 0 || i.txMBs > 0);
     // Repli tx Windows : compteur SentBytes cassé (latch txBrokenWin) — le
     // débit sortant vient de netstat -e (agrégé, affecté à l'interface par
     // défaut qui porte l'essentiel du trafic). Toutes les 2 s tant que cassé.
@@ -216,7 +261,7 @@ async function collect() {
         if (prevNetstat && dt > 0.5) {
           const dtx = (nt.tx_bytes - prevNetstat.tx) / 1048576;
           if (dtx > 0) {
-            const target = ifaceList.find(i => i.isDefault) || ifaceList[0];
+            const target = visible.find(i => i.isDefault) || visible[0];
             target.txMBs = Math.round(dtx / dt * 10) / 10;
             try {
               const logger = require('../logger');
@@ -249,7 +294,7 @@ async function collect() {
     }
     return {
       ok: true,
-      interfaces: ifaceList,
+      interfaces: visible,
       defaultGateway: defGw ? { iface: defGw.iface, ip4: defGw.ip4 } : null,
       wan: wanData,
       routes: await routes()
@@ -259,4 +304,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, matchStats, computeRates, parseAdapterStats, parseNetstatTotals, isUsefulIface, name: 'network' };
+module.exports = { collect, matchStats, computeRates, parseAdapterStats, parseNetstatTotals, parseNetstatIB, isUsefulIface, name: 'network' };

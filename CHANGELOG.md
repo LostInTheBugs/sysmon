@@ -2,6 +2,21 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.031] — 2026-08-23
+
+### Fixed
+- macOS 26: `si.networkStats()` returns a single `utun` entry instead of all
+  interfaces (systeminformation broken on the new macOS netstat output) —
+  the collector now reads `netstat -ib` directly on macOS (stable format,
+  counters per interface, tunnel lines without MAC handled). Verified live
+  on the target MacBook: en0 shows real rates during a 10 MB download
+- Tunnel interfaces (utun/tap/tun) now appear only while they carry traffic
+  (active VPN) — no more dead tunnel rows
+
+### Tests
+- `scripts/test-network-match.js`: netstat -ib parsing with real MacBook
+  output (15 checks)
+
 ## [2026.08.029] — 2026-08-23
 
 ### Fixed
