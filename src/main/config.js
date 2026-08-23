@@ -21,6 +21,9 @@ const DEFAULTS = {
     enabled: false,     // mode "dans la barre" (tray texte Windows / menu bar macOS)
     metric: 'cpu'       // 'cpu' | 'mem' | 'gpu' | 'net' | 'temp' | 'batt' | 'none'
   },
+  autoStart: false,     // démarrage au login (Windows/macOS/Linux)
+  syncMode: 'push',     // maître ↔ esclave : 'push' | 'pull' | 'both'
+  language: 'auto',     // 'auto' | 'fr' | 'en'
   widget: {
     alwaysOnTop: true,
     opacity: 0.95,

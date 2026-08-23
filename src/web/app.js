@@ -6,7 +6,7 @@
 const hostsEl = document.getElementById('hosts');
 const connEl = document.getElementById('conn');
 const logsPanel = document.getElementById('logs-panel');
-const logsEl = document.getElementById('logs');
+const logsEl = document.getElementById('log-lines');
 const logHostSel = document.getElementById('log-host');
 const logLevelSel = document.getElementById('log-level');
 const logsCountEl = document.getElementById('logs-count');
@@ -34,7 +34,7 @@ function renderLogs() {
   const rows = logBuffer.filter(l => (!host || l.host === host) && LV[l.level] >= LV[lvl]);
   logsCountEl.textContent = rows.length + ' shown';
   if (!rows.length) {
-    logsEl.innerHTML = '<div class="logs-empty">No logs yet…</div>';
+    logsEl.innerHTML = '<div class="logs-empty">' + sysmonI18n.t('dash.logsEmpty') + '</div>';
     return;
   }
   logsEl.innerHTML = rows.slice(-300).map(l =>
@@ -55,8 +55,7 @@ async function refreshLogs() {
     }
     if (logBuffer.length > 800) logBuffer.splice(0, logBuffer.length - 800);
     // rafraîchir la liste des hôtes si elle a changé
-    const opts = ['<option value="">all hosts</option>', ...[...logHosts].sort().map(h => `<option>${esc(h)}</option>`)].join('');
-    if (logHostSel.innerHTML !== opts) logHostSel.innerHTML = opts;
+    applyLogsFilters();
     if (!logsPanel.classList.contains('hidden')) renderLogs();
   } catch { /* le master est peut-être en train de redémarrer */ }
 }
@@ -130,6 +129,77 @@ function historyCharts(histKey) {
   return html;
 }
 
+// --- langue : celle du master (config.language), sinon détection navigateur ---
+fetch('/api/status').then(r => r.json()).then(st => {
+  sysmonI18n.setLang(st.language || 'auto');
+  sysmonI18n.apply(document);
+  applyLogsFilters();
+}).catch(() => { sysmonI18n.apply(document); });
+
+// --- config à distance d'un slave ---------------------------------------------
+const cfgModal = document.getElementById('cfg-modal');
+let cfgSlaveId = null;
+const MODULE_NAMES = ['cpu', 'memory', 'disks', 'battery', 'network', 'connectivity', 'sensors', 'gpu', 'llm', 'vms'];
+
+function openCfgModal(slave) {
+  cfgSlaveId = slave.id;
+  document.getElementById('cfg-slave-name').textContent = slave.name;
+  const cur = slave.remoteConfig || {};
+  const mods = cur.modules || {}; // vide = défauts du maître
+  document.getElementById('cfg-modules').innerHTML = MODULE_NAMES.map(name => {
+    const checked = Object.keys(mods).length ? !!mods[name] : true;
+    return `<label class="cfg-mod"><input type="checkbox" data-mod="${name}" ${checked ? 'checked' : ''}/>${name}</label>`;
+  }).join('');
+  document.getElementById('cfg-interval').value = String(cur.pushIntervalMs || 2000);
+  document.getElementById('cfg-loglevel').value = cur.logLevel || 'debug';
+  document.getElementById('cfg-status').textContent = '';
+  cfgModal.classList.remove('hidden');
+}
+
+function closeCfgModal() { cfgModal.classList.add('hidden'); }
+
+async function saveCfg() {
+  const modules = {};
+  document.querySelectorAll('#cfg-modules input[type=checkbox]').forEach(i => { modules[i.dataset.mod] = i.checked; });
+  const cfg = {
+    modules,
+    pushIntervalMs: parseInt(document.getElementById('cfg-interval').value, 10),
+    logLevel: document.getElementById('cfg-loglevel').value
+  };
+  try {
+    const r = await fetch('/api/slave-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: cfgSlaveId, config: cfg })
+    });
+    const j = await r.json();
+    const st = document.getElementById('cfg-status');
+    st.className = 'cfg-status ' + (j.ok ? 'ok' : 'err');
+    st.textContent = j.ok ? sysmonI18n.t('dash.configSaved') : sysmonI18n.t('dash.configFailed');
+    if (j.ok) setTimeout(closeCfgModal, 900);
+  } catch {
+    const st = document.getElementById('cfg-status');
+    st.className = 'cfg-status err';
+    st.textContent = sysmonI18n.t('dash.configFailed');
+  }
+}
+
+async function resetCfg() {
+  const r = await fetch('/api/slave-config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: cfgSlaveId, config: { modules: null, pushIntervalMs: null, logLevel: null } })
+  });
+  const j = await r.json();
+  const st = document.getElementById('cfg-status');
+  st.className = 'cfg-status ' + (j.ok ? 'ok' : 'err');
+  st.textContent = j.ok ? sysmonI18n.t('dash.configSaved') : sysmonI18n.t('dash.configFailed');
+  if (j.ok) setTimeout(closeCfgModal, 900);
+}
+
+document.getElementById('cfg-cancel').addEventListener('click', closeCfgModal);
+document.getElementById('cfg-save').addEventListener('click', saveCfg);
+document.getElementById('cfg-reset').addEventListener('click', resetCfg);
+cfgModal.addEventListener('click', e => { if (e.target === cfgModal) closeCfgModal(); });
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = v => v ?? '—';
 
@@ -148,13 +218,18 @@ function fmtBytes(b) {
   return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' ' + u[i];
 }
 
-function hostCard(name, h, online) {
+function hostCard(name, h, online, hostId) {
   const m = h.modules || {};
-  let html = `<div class="host"><h2><span class="dot ${online ? 'on' : ''}"></span>${esc(name)}</h2>`;
+  let html = `<div class="host"><h2><span class="dot ${online ? 'on' : ''}"></span>${esc(name)}`;
+  // ⚙ config à distance (uniquement pour les slaves, pas la carte master)
+  if (hostId && hostId !== 'master') {
+    html += `<button class="cfg-btn" data-cfg="${esc(hostId)}" title="⚙">⚙</button>`;
+  }
+  html += `</h2>`;
   html += `<div class="sub">${esc(h.host ? [h.host.platform, h.host.distro, h.host.arch, h.host.kernel].filter(Boolean).join(' · ') : '')} · ${esc(h.host ? h.host.hostname : '')}</div>`;
   if (!h.timestamp) {
     // Slave approuvé mais pas encore de données (démarrage, redémarrage…)
-    html += '<div class="wait">Waiting for data…</div><div class="grid"></div></div>';
+    html += '<div class="wait">' + sysmonI18n.t('dash.waiting') + '</div><div class="grid"></div></div>';
     return html;
   }
   html += '<div class="grid">';
@@ -246,52 +321,69 @@ function hostCard(name, h, online) {
 
 function renderSlavesBar(slaves) {
   const pending = (slaves || []).filter(s => s.status === 'pending');
-  const barEl = document.getElementById('slaves-bar');
+  const barEl = document.getElementById('pending-bar');
   if (!pending.length) {
-    if (barEl) barEl.remove();
+    if (barEl) barEl.classList.add('hidden');
     return;
   }
-  if (!barEl) {
-    const el = document.createElement('div');
-    el.id = 'slaves-bar';
-    el.className = 'slaves-bar';
-    document.querySelector('main').prepend(el);
-    renderSlavesBar(slaves);
-    return;
-  }
-  barEl.innerHTML = '';
+  barEl.classList.remove('hidden');
+  const wrap = document.getElementById('pending-actions');
+  wrap.innerHTML = '';
   for (const s of pending) {
     const div = document.createElement('div');
     div.className = 'slave-card';
-    div.innerHTML = `<span class="badge pending">pending</span><span>${esc(s.name)}</span><span class="meta">${esc(s.ip || '')}</span>
-      <button data-id="${s.id}" data-act="approve">✓ Approve</button><button data-id="${s.id}" data-act="reject">✕ Reject</button>`;
+    div.innerHTML = `<span>${esc(s.name)}</span><span class="meta">${esc(s.ip || '')}</span>
+      <button data-id="${s.id}" data-act="approve">${sysmonI18n.t('dash.approve')}</button><button data-id="${s.id}" data-act="reject">${sysmonI18n.t('dash.reject')}</button>`;
     div.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', async () => {
         await fetch(`/api/slaves/${btn.dataset.id}/${btn.dataset.act}`, { method: 'POST' });
       });
     });
-    barEl.appendChild(div);
+    wrap.appendChild(div);
   }
+}
+
+function applyLogsFilters() {
+  const sel = document.getElementById('log-host');
+  if (!sel) return;
+  const cur = sel.value;
+  const opts = ['', ...[...logHosts].sort()];
+  sel.innerHTML = opts.map(h => `<option value="${esc(h)}">${h ? esc(h) : sysmonI18n.t('dash.allHosts')}</option>`).join('');
+  sel.value = cur;
 }
 
 function render(data) {
   if (!data) return;
-  if (data.type === 'slaves') { renderSlavesBar(data.list); return; }
+  if (data.type === 'slaves') {
+    lastSlavesList = data.list;
+    renderSlavesBar(data.list);
+    return;
+  }
   if (data.type !== 'snapshots') return;
   let html = '';
   for (const [id, h] of Object.entries(data.hosts || {})) {
     const online = !!h.timestamp;
-    html += hostCard(h.name || id, h, online);
+    html += hostCard(h.name || id, h, online, id);
   }
   hostsEl.innerHTML = html || '<div style="color:#7f8ea3;padding:20px">No data yet…</div>';
+  // boutons ⚙ (config à distance) — délégation
+  hostsEl.querySelectorAll('.cfg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.cfg;
+      const slave = (lastSlavesList || []).find(s => s.id === id);
+      if (slave) openCfgModal(slave);
+    });
+  });
 }
+
+let lastSlavesList = [];
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen = () => { connEl.textContent = '● live'; connEl.className = 'conn on'; ws.send(JSON.stringify({ type: 'subscribe' })); };
+  ws.onopen = () => { connEl.textContent = '● ' + sysmonI18n.t('dash.conn.online'); connEl.className = 'conn on'; ws.send(JSON.stringify({ type: 'subscribe' })); };
   ws.onmessage = e => { try { render(JSON.parse(e.data)); } catch { /* ignore */ } };
-  ws.onclose = () => { connEl.textContent = '● disconnected — retrying…'; connEl.className = 'conn off'; setTimeout(connect, 3000); };
+  ws.onclose = () => { connEl.textContent = '● ' + sysmonI18n.t('dash.conn.offline') + ' — retrying…'; connEl.className = 'conn off'; setTimeout(connect, 3000); };
   ws.onerror = () => ws.close();
 }
 connect();

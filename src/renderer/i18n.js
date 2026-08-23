@@ -1,0 +1,232 @@
+'use strict';
+// i18n minimaliste pour le widget et la fenêtre paramètres.
+// - DICT : dictionnaire fr/en (clés stables)
+// - t(key) : traduction courante
+// - apply(root) : applique data-i18n (texte), data-i18n-title (tooltip),
+//   data-i18n-ph (placeholder), data-i18n-opt (options de <select>)
+// La langue vient de config.language : 'auto' (langue du système) | 'fr' | 'en'
+
+const DICT = {
+  fr: {
+    'settings.title': 'Paramètres',
+    'settings.sub': 'Paramètres',
+    'mode.standalone': 'Autonome',
+    'mode.master': 'Maître',
+    'mode.slave': 'Esclave',
+    'mode.standalone.desc': 'Widget seul',
+    'mode.master.desc': 'Dashboard web',
+    'mode.slave.desc': 'Envoie au maître',
+    'btn.save': 'Enregistrer',
+    'btn.close': 'Fermer',
+    'status.saved': '✔ Enregistré et appliqué.',
+    'status.error': 'Erreur : ',
+    'card.mode': 'Mode de fonctionnement',
+    'card.appearance': 'Apparence',
+    'card.logs': 'Logs',
+    'card.charts': 'Affichage des graphiques',
+    'card.history': 'Historique des ressources',
+    'card.bar': 'Barre système (mode "dans la barre")',
+    'card.modules': 'Modules d\'information',
+    'card.master': 'Options du maître',
+    'card.slave': 'Options de l\'esclave',
+    'card.system': 'Système',
+    'field.port': 'Port',
+    'field.webAccess': 'Accès web (dashboard)',
+    'field.autoApprove': 'Valider les slaves automatiquement',
+    'field.masterIp': 'IP du maître',
+    'field.logLevel': 'Niveau de logs',
+    'field.theme': 'Thème',
+    'field.accent': 'Couleur d\'accent',
+    'field.chartMode': 'Mode d\'affichage',
+    'field.historyEnabled': 'Enregistrer l\'historique',
+    'field.historyMinutes': 'Fenêtre',
+    'field.barEnabled': 'Afficher une valeur en direct dans la barre',
+    'field.barMetric': 'Valeur affichée',
+    'field.autoStart': 'Lancer au démarrage de la session',
+    'field.syncMode': 'Synchronisation maître ↔ esclave',
+    'field.language': 'Langue',
+    'chart.instant': 'Instantané (valeurs)',
+    'chart.history': 'Courbes historiques',
+    'bar.cpu': 'CPU %',
+    'bar.mem': 'RAM %',
+    'bar.gpu': 'GPU %',
+    'bar.net': 'Réseau ↓/↑',
+    'bar.temp': 'Température °C',
+    'bar.batt': 'Batterie %',
+    'sync.push': 'Push (l\'esclave envoie)',
+    'sync.pull': 'Pull (le maître demande)',
+    'sync.both': 'Bidirectionnel',
+    'lang.auto': 'Automatique (système)',
+    'lang.fr': 'Français',
+    'lang.en': 'English',
+    'theme.dark': 'Sombre',
+    'theme.light': 'Clair',
+    'theme.amoled': 'AMOLED',
+    'theme.compact': 'Compact',
+    'slaves.title': 'SLAVES',
+    'slaves.count': '{n} machine(s)',
+    'slaves.pending': 'en attente de validation',
+    'slaves.waiting': 'en attente de données…',
+    'widget.loading': 'Collecte des informations…',
+    'widget.noModules': 'Aucun module activé…',
+    'widget.renderError': 'Erreur d\'affichage: ',
+    'widget.settings': 'Paramètres',
+    'widget.close': 'Fermer',
+    'widget.charts': 'Courbes historiques — clic pour instantané',
+    'widget.charts2': 'Instantané — clic pour courbes historiques',
+    'chart.empty': 'collecte…',
+    'sec.cpu': 'CPU',
+    'sec.cpuUsage': 'Utilisation CPU',
+    'sec.cpuFreq': 'Fréquence CPU',
+    'sec.memory': 'Mémoire',
+    'sec.gpu': 'GPU',
+    'sec.disks': 'Disques',
+    'sec.battery': 'Batterie',
+    'sec.network': 'Réseau',
+    'sec.sensors': 'Sondes',
+    'sec.connectivity': 'Connectivité',
+    'sec.llm': 'LLM',
+    'sec.vms': 'Virtualisation',
+    'hint.theme': 'Appliqué en direct au widget, aux paramètres et au dashboard web.',
+    'hint.logs': 'En mode esclave, les logs sont envoyés au maître et visibles dans le dashboard web (onglet Logs).',
+    'hint.charts': 'Bouton 📊/📈 en haut du widget pour basculer rapidement. En mode courbes, les graphiques montrent l\'évolution sur la fenêtre d\'historique.',
+    'hint.history': 'En mémoire, sur chaque machine (slave : ses propres ressources — master : les siennes + celles reçues des slaves). Visible en mode courbes et sur le dashboard web.',
+    'hint.bar': 'Windows : texte dans la zone de notification (icône SysMon avec la valeur). macOS : dans la barre de menu. Survolez pour le détail complet. Désactiver pour revenir à l\'icône radar.',
+    'hint.port': 'Port du dashboard web / de la connexion au maître.',
+    'hint.slaves': 'Gérez les slaves (validation, config) depuis le dashboard web ou cette fenêtre.',
+    'hint.slavesEmpty': 'Visible uniquement en mode maître.',
+    'hint.masterIp': 'IP du maître',
+    'hint.autoStart': 'Windows/macOS : entrée de session. Linux : fichier ~/.config/autostart.',
+    'hint.sync': 'Push : l\'esclave envoie ses données. Pull : le maître les demande. Les deux : push + demande à la demande.',
+    'hint.portable': 'Mode portable actif : la configuration et les logs sont stockés à côté de l\'exécutable (fichier portable.json).',
+    'master.slavesList': 'Slaves connus'
+  },
+  en: {
+    'settings.title': 'Settings',
+    'settings.sub': 'Settings',
+    'mode.standalone': 'Standalone',
+    'mode.master': 'Master',
+    'mode.slave': 'Slave',
+    'mode.standalone.desc': 'Widget only',
+    'mode.master.desc': 'Web dashboard',
+    'mode.slave.desc': 'Sends to the master',
+    'btn.save': 'Save',
+    'btn.close': 'Close',
+    'status.saved': '✔ Saved and applied.',
+    'status.error': 'Error: ',
+    'card.mode': 'Operating mode',
+    'card.appearance': 'Appearance',
+    'card.logs': 'Logs',
+    'card.charts': 'Chart display',
+    'card.history': 'Resource history',
+    'card.bar': 'System bar ("in the bar" mode)',
+    'card.modules': 'Information modules',
+    'card.master': 'Master options',
+    'card.slave': 'Slave options',
+    'card.system': 'System',
+    'field.port': 'Port',
+    'field.webAccess': 'Web access (dashboard)',
+    'field.autoApprove': 'Approve slaves automatically',
+    'field.masterIp': 'Master IP',
+    'field.logLevel': 'Log level',
+    'field.theme': 'Theme',
+    'field.accent': 'Accent color',
+    'field.chartMode': 'Display mode',
+    'field.historyEnabled': 'Record history',
+    'field.historyMinutes': 'Window',
+    'field.barEnabled': 'Show a live value in the bar',
+    'field.barMetric': 'Displayed value',
+    'field.autoStart': 'Launch at session login',
+    'field.syncMode': 'Master ↔ slave sync',
+    'field.language': 'Language',
+    'chart.instant': 'Instant (values)',
+    'chart.history': 'Historical curves',
+    'bar.cpu': 'CPU %',
+    'bar.mem': 'RAM %',
+    'bar.gpu': 'GPU %',
+    'bar.net': 'Network ↓/↑',
+    'bar.temp': 'Temperature °C',
+    'bar.batt': 'Battery %',
+    'sync.push': 'Push (slave sends)',
+    'sync.pull': 'Pull (master asks)',
+    'sync.both': 'Bidirectional',
+    'lang.auto': 'Automatic (system)',
+    'lang.fr': 'Français',
+    'lang.en': 'English',
+    'theme.dark': 'Dark',
+    'theme.light': 'Light',
+    'theme.amoled': 'AMOLED',
+    'theme.compact': 'Compact',
+    'slaves.title': 'SLAVES',
+    'slaves.count': '{n} machine(s)',
+    'slaves.pending': 'pending approval',
+    'slaves.waiting': 'waiting for data…',
+    'widget.loading': 'Collecting system info…',
+    'widget.noModules': 'No modules enabled…',
+    'widget.renderError': 'Render error: ',
+    'widget.settings': 'Settings',
+    'widget.close': 'Close',
+    'widget.charts': 'Historical curves — click for instant',
+    'widget.charts2': 'Instant — click for historical curves',
+    'chart.empty': 'collecting…',
+    'sec.cpu': 'CPU',
+    'sec.cpuUsage': 'CPU usage',
+    'sec.cpuFreq': 'CPU frequency',
+    'sec.memory': 'Memory',
+    'sec.gpu': 'GPU',
+    'sec.disks': 'Disks',
+    'sec.battery': 'Battery',
+    'sec.network': 'Network',
+    'sec.sensors': 'Sensors',
+    'sec.connectivity': 'Connectivity',
+    'sec.llm': 'LLM',
+    'sec.vms': 'Virtualization',
+    'hint.theme': 'Applied live to the widget, settings and web dashboard.',
+    'hint.logs': 'In slave mode, logs are sent to the master and visible in the web dashboard (Logs tab).',
+    'hint.charts': 'Use the 📊/📈 button on the widget title bar to switch quickly. In curves mode, charts show the evolution over the history window.',
+    'hint.history': 'In memory, on each machine (slave: its own resources — master: its own + those received from slaves). Visible in curves mode and on the web dashboard.',
+    'hint.bar': 'Windows: text in the notification area (SysMon icon with the value). macOS: in the menu bar. Hover for full details. Disable to go back to the radar icon.',
+    'hint.port': 'Web dashboard / master connection port.',
+    'hint.slaves': 'Manage slaves (approval, config) from the web dashboard or this window.',
+    'hint.slavesEmpty': 'Only visible in master mode.',
+    'hint.masterIp': 'Master IP',
+    'hint.autoStart': 'Windows/macOS: session entry. Linux: ~/.config/autostart file.',
+    'hint.sync': 'Push: the slave sends its data. Pull: the master requests it. Both: push + on-demand requests.',
+    'hint.portable': 'Portable mode active: configuration and logs are stored next to the executable (portable.json file).',
+    'master.slavesList': 'Known slaves'
+  }
+};
+
+let current = 'en';
+
+function detect() {
+  return (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+}
+
+function setLang(lang) {
+  current = lang === 'auto' ? detect() : (lang === 'fr' ? 'fr' : 'en');
+  document.documentElement.lang = current;
+}
+
+function getLang() { return current; }
+
+function t(key) {
+  const d = DICT[current] || DICT.en;
+  return d[key] !== undefined ? d[key] : (DICT.en[key] !== undefined ? DICT.en[key] : key);
+}
+
+// Applique les traductions sur un sous-arbre (data-i18n / data-i18n-title / data-i18n-ph / data-i18n-opt)
+function apply(root) {
+  root = root || document;
+  root.querySelectorAll('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
+  root.querySelectorAll('[data-i18n-title]').forEach(n => { n.title = t(n.dataset.i18nTitle); });
+  root.querySelectorAll('[data-i18n-ph]').forEach(n => { n.placeholder = t(n.dataset.i18nPh); });
+  root.querySelectorAll('[data-i18n-opt]').forEach(n => {
+    for (const o of n.options) {
+      const k = o.dataset.i18nKey;
+      if (k) o.textContent = t(k);
+    }
+  });
+}
+
+window.sysmonI18n = { t, apply, setLang, getLang };

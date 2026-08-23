@@ -28,8 +28,24 @@ async function load() {
   const bar = config.barMode || {};
   $('#barEnabled').checked = !!bar.enabled;
   $('#barMetric').value = bar.metric || 'cpu';
+  $('#autoStart').checked = !!config.autoStart;
+  $('#syncMode').value = config.syncMode || 'push';
+  $('#language').value = config.language || 'auto';
+  if (config.portable) $('#portable-hint').style.display = 'block';
+  // i18n : langue + étiquettes
+  sysmonI18n.setLang(config.language || 'auto');
+  sysmonI18n.apply(document);
+  $('#mode-badge').textContent = sysmonI18n.t('mode.' + config.mode);
   applyTheme(config);
 }
+
+// Changement de langue → application en direct (sans attendre Enregistrer)
+$('#language').addEventListener('change', () => {
+  sysmonI18n.setLang($('#language').value);
+  sysmonI18n.apply(document);
+  $('#mode-badge').textContent = sysmonI18n.t('mode.' + (config.mode || 'standalone'));
+  renderModules();
+});
 
 // --- thème : aperçu en direct, persisté au clic sur Enregistrer --------------
 function applyTheme(cfg) {
@@ -131,10 +147,14 @@ $('#save').addEventListener('click', async () => {
       historyEnabled: $('#historyEnabled').checked,
       historyMinutes: parseInt($('#historyMinutes').value, 10) || 30,
       barMode: { enabled: $('#barEnabled').checked, metric: $('#barMetric').value },
+      autoStart: $('#autoStart').checked,
+      syncMode: $('#syncMode').value,
+      language: $('#language').value,
       modules
     });
     status.className = 'status ok';
-    status.textContent = '✔ Enregistré et appliqué.';
+    status.textContent = sysmonI18n.t('status.saved');
+    $('#mode-badge').textContent = sysmonI18n.t('mode.' + config.mode);
     refreshSlaves();
   } catch (e) {
     status.className = 'status err';

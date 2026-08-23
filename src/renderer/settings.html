@@ -10,48 +10,56 @@
   <div id="app">
     <header>
       <h1>SYSMON</h1>
-      <span class="sub">Paramètres</span>
+      <span class="sub" data-i18n="settings.sub">Paramètres</span>
       <span id="mode-badge" class="badge">standalone</span>
-      <button id="win-close" title="Fermer">✕</button>
+      <button id="win-close" data-i18n-title="btn.close" title="Fermer">✕</button>
     </header>
     <main>
       <div class="card">
-        <h2>Mode de fonctionnement</h2>
+        <h2 data-i18n="card.mode">Mode de fonctionnement</h2>
         <div class="modes">
-          <div class="mode" data-mode="standalone"><div class="ic">🧍</div><div class="t">Autonome</div><div class="d">Widget seul</div></div>
-          <div class="mode" data-mode="master"><div class="ic">🖥️</div><div class="t">Maître</div><div class="d">Dashboard web</div></div>
-          <div class="mode" data-mode="slave"><div class="ic">🔗</div><div class="t">Esclave</div><div class="d">Envoie au maître</div></div>
+          <div class="mode" data-mode="standalone"><div class="ic">🧍</div><div class="t" data-i18n="mode.standalone">Autonome</div><div class="d" data-i18n="mode.standalone.desc">Widget seul</div></div>
+          <div class="mode" data-mode="master"><div class="ic">🖥️</div><div class="t" data-i18n="mode.master">Maître</div><div class="d" data-i18n="mode.master.desc">Dashboard web</div></div>
+          <div class="mode" data-mode="slave"><div class="ic">🔗</div><div class="t" data-i18n="mode.slave">Esclave</div><div class="d" data-i18n="mode.slave.desc">Envoie au maître</div></div>
         </div>
       </div>
 
       <div class="card" id="master-card" style="display:none">
-        <h2>Options du maître</h2>
-        <div class="field"><label>Port du serveur web</label><input type="number" id="port" min="1" max="65535" /></div>
-        <div class="field"><label>Accès web actif</label><span class="switch"><input type="checkbox" id="webAccess" /><span class="sl"></span></span></div>
-        <div class="field"><label>Valider les esclaves automatiquement</label><span class="switch"><input type="checkbox" id="autoApproveSlaves" /><span class="sl"></span></span></div>
+        <h2 data-i18n="card.master">Options du maître</h2>
+        <div class="field"><label data-i18n="field.port">Port du serveur web</label><input type="number" id="port" min="1" max="65535" /></div>
+        <div class="field"><label data-i18n="field.webAccess">Accès web actif</label><span class="switch"><input type="checkbox" id="webAccess" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.autoApprove">Valider les esclaves automatiquement</label><span class="switch"><input type="checkbox" id="autoApproveSlaves" /><span class="sl"></span></span></div>
+        <div class="hint" data-i18n="hint.port">Port du dashboard web / de la connexion au maître.</div>
       </div>
 
       <div class="card" id="slave-card" style="display:none">
-        <h2>Options de l'esclave</h2>
-        <div class="field"><label>IP du maître</label><input type="text" id="masterIp" placeholder="192.168.1.10" /></div>
-        <div class="hint">Laissez vide pour rechercher le maître automatiquement sur le réseau (broadcast UDP).</div>
+        <h2 data-i18n="card.slave">Options de l'esclave</h2>
+        <div class="field"><label data-i18n="field.masterIp">IP du maître</label><input type="text" id="masterIp" data-i18n-ph="hint.masterIp" placeholder="192.168.1.10" /></div>
+        <div class="hint" data-i18n="hint.slaves">Laissez vide pour rechercher le maître automatiquement sur le réseau (broadcast UDP). Gérez les slaves (validation, config) depuis le dashboard web ou cette fenêtre.</div>
       </div>
 
       <div class="card">
-        <h2>Apparence</h2>
+        <h2 data-i18n="card.appearance">Apparence</h2>
         <div class="themes">
-          <div class="theme" data-theme="dark"><div class="sw dark"></div><div class="t">Sombre</div></div>
-          <div class="theme" data-theme="light"><div class="sw light"></div><div class="t">Clair</div></div>
-          <div class="theme" data-theme="amoled"><div class="sw amoled"></div><div class="t">AMOLED</div></div>
-          <div class="theme" data-theme="compact"><div class="sw compact"></div><div class="t">Compact</div></div>
+          <div class="theme" data-theme="dark"><div class="sw dark"></div><div class="t" data-i18n="theme.dark">Sombre</div></div>
+          <div class="theme" data-theme="light"><div class="sw light"></div><div class="t" data-i18n="theme.light">Clair</div></div>
+          <div class="theme" data-theme="amoled"><div class="sw amoled"></div><div class="t" data-i18n="theme.amoled">AMOLED</div></div>
+          <div class="theme" data-theme="compact"><div class="sw compact"></div><div class="t" data-i18n="theme.compact">Compact</div></div>
         </div>
-        <div class="field" style="margin-top:10px"><label>Couleur d'accent</label><input type="color" id="accent" /></div>
-        <div class="hint">Appliqué en direct au widget, aux paramètres et au dashboard web.</div>
+        <div class="field" style="margin-top:10px"><label data-i18n="field.accent">Couleur d'accent</label><input type="color" id="accent" /></div>
+        <div class="hint" data-i18n="hint.theme">Appliqué en direct au widget, aux paramètres et au dashboard web.</div>
+        <div class="field"><label data-i18n="field.language">Langue</label>
+          <select id="language">
+            <option value="auto" data-i18n-key="lang.auto">Automatique (système)</option>
+            <option value="fr" data-i18n-key="lang.fr">Français</option>
+            <option value="en" data-i18n-key="lang.en">English</option>
+          </select>
+        </div>
       </div>
 
       <div class="card">
-        <h2>Logs</h2>
-        <div class="field"><label>Niveau de logs</label>
+        <h2 data-i18n="card.logs">Logs</h2>
+        <div class="field"><label data-i18n="field.logLevel">Niveau de logs</label>
           <select id="logLevel">
             <option value="debug">debug</option>
             <option value="info">info</option>
@@ -59,24 +67,24 @@
             <option value="error">error</option>
           </select>
         </div>
-        <div class="hint">En mode esclave, les logs sont envoyés au maître et visibles dans le dashboard web (onglet Logs).</div>
+        <div class="hint" data-i18n="hint.logs">En mode esclave, les logs sont envoyés au maître et visibles dans le dashboard web (onglet Logs).</div>
       </div>
 
       <div class="card">
-        <h2>Affichage des graphiques</h2>
-        <div class="field"><label>Mode d'affichage</label>
+        <h2 data-i18n="card.charts">Affichage des graphiques</h2>
+        <div class="field"><label data-i18n="field.chartMode">Mode d'affichage</label>
           <select id="chartMode">
-            <option value="instant">Instantané (valeurs)</option>
-            <option value="history">Courbes historiques</option>
+            <option value="instant" data-i18n-key="chart.instant">Instantané (valeurs)</option>
+            <option value="history" data-i18n-key="chart.history">Courbes historiques</option>
           </select>
         </div>
-        <div class="hint">Bouton 📊/📈 en haut du widget pour basculer rapidement. En mode courbes, les graphiques montrent l'évolution sur la fenêtre d'historique.</div>
+        <div class="hint" data-i18n="hint.charts">Bouton 📊/📈 en haut du widget pour basculer rapidement. En mode courbes, les graphiques montrent l'évolution sur la fenêtre d'historique.</div>
       </div>
 
       <div class="card">
-        <h2>Historique des ressources</h2>
-        <div class="field"><label>Enregistrer l'historique</label><span class="switch"><input type="checkbox" id="historyEnabled" /><span class="sl"></span></span></div>
-        <div class="field"><label>Fenêtre</label>
+        <h2 data-i18n="card.history">Historique des ressources</h2>
+        <div class="field"><label data-i18n="field.historyEnabled">Enregistrer l'historique</label><span class="switch"><input type="checkbox" id="historyEnabled" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.historyMinutes">Fenêtre</label>
           <select id="historyMinutes">
             <option value="10">10 minutes</option>
             <option value="30">30 minutes</option>
@@ -84,41 +92,56 @@
             <option value="120">2 heures</option>
           </select>
         </div>
-        <div class="hint">En mémoire, sur chaque machine (slave : ses propres ressources — master : les siennes + celles reçues des slaves). Visible en mode courbes et sur le dashboard web.</div>
+        <div class="hint" data-i18n="hint.history">En mémoire, sur chaque machine (slave : ses propres ressources — master : les siennes + celles reçues des slaves). Visible en mode courbes et sur le dashboard web.</div>
       </div>
 
       <div class="card">
-        <h2>Barre système (mode "dans la barre")</h2>
-        <div class="field"><label>Afficher une valeur en direct dans la barre</label><span class="switch"><input type="checkbox" id="barEnabled" /><span class="sl"></span></span></div>
-        <div class="field"><label>Valeur affichée</label>
+        <h2 data-i18n="card.bar">Barre système (mode "dans la barre")</h2>
+        <div class="field"><label data-i18n="field.barEnabled">Afficher une valeur en direct dans la barre</label><span class="switch"><input type="checkbox" id="barEnabled" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.barMetric">Valeur affichée</label>
           <select id="barMetric">
-            <option value="cpu">CPU %</option>
-            <option value="mem">RAM %</option>
-            <option value="gpu">GPU %</option>
-            <option value="net">Réseau ↓/↑</option>
-            <option value="temp">Température °C</option>
-            <option value="batt">Batterie %</option>
+            <option value="cpu" data-i18n-key="bar.cpu">CPU %</option>
+            <option value="mem" data-i18n-key="bar.mem">RAM %</option>
+            <option value="gpu" data-i18n-key="bar.gpu">GPU %</option>
+            <option value="net" data-i18n-key="bar.net">Réseau ↓/↑</option>
+            <option value="temp" data-i18n-key="bar.temp">Température °C</option>
+            <option value="batt" data-i18n-key="bar.batt">Batterie %</option>
           </select>
         </div>
-        <div class="hint">Windows : texte dans la zone de notification (icône SysMon avec la valeur). macOS : dans la barre de menu. Survolez pour le détail complet. Désactiver pour revenir à l'icône radar.</div>
+        <div class="hint" data-i18n="hint.bar">Windows : texte dans la zone de notification (icône SysMon avec la valeur). macOS : dans la barre de menu. Survolez pour le détail complet. Désactiver pour revenir à l'icône radar.</div>
       </div>
 
       <div class="card">
-        <h2>Modules d'information</h2>
+        <h2 data-i18n="card.system">Système</h2>
+        <div class="field"><label data-i18n="field.autoStart">Lancer au démarrage de la session</label><span class="switch"><input type="checkbox" id="autoStart" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.syncMode">Synchronisation maître ↔ esclave</label>
+          <select id="syncMode">
+            <option value="push" data-i18n-key="sync.push">Push (l'esclave envoie)</option>
+            <option value="pull" data-i18n-key="sync.pull">Pull (le maître demande)</option>
+            <option value="both" data-i18n-key="sync.both">Bidirectionnel</option>
+          </select>
+        </div>
+        <div class="hint" data-i18n="hint.sync">Push : l'esclave envoie ses données. Pull : le maître les demande. Les deux : push + demande à la demande.</div>
+        <div class="hint" id="portable-hint" style="display:none" data-i18n="hint.portable">Mode portable actif : la configuration et les logs sont stockés à côté de l'exécutable (fichier portable.json).</div>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="card.modules">Modules d'information</h2>
         <div class="grid" id="modules"></div>
       </div>
 
       <div class="card" id="slaves-card">
-        <h2>Esclaves</h2>
-        <div id="slaves"><div class="hint">Visible uniquement en mode maître.</div></div>
+        <h2 data-i18n="master.slavesList">Esclaves</h2>
+        <div id="slaves"><div class="hint" data-i18n="hint.slavesEmpty">Visible uniquement en mode maître.</div></div>
       </div>
     </main>
     <footer>
       <div id="status" class="status"></div>
-      <button id="close">Fermer</button>
-      <button id="save" class="primary">Enregistrer</button>
+      <button id="close" data-i18n="btn.close">Fermer</button>
+      <button id="save" class="primary" data-i18n="btn.save">Enregistrer</button>
     </footer>
   </div>
+  <script src="i18n.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

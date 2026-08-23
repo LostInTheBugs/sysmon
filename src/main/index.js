@@ -5,6 +5,8 @@
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const config = require('./config');
 const logger = require('./logger');
 const history = require('./history');
@@ -24,7 +26,14 @@ const APP_ICON = process.platform === 'win32'
   : path.join(__dirname, '..', '..', 'build', 'icon.png');
 
 // userData stable et cohérent sur les 3 OS (productName mettrait une majuscule)
-app.setPath('userData', path.join(app.getPath('appData'), 'sysmon'));
+// --- mode portable : un fichier portable.json à côté de l'exe → config + logs
+// dans le même dossier (clé USB). ---
+const PORTABLE_MODE = fs.existsSync(path.join(path.dirname(process.execPath), 'portable.json'));
+if (PORTABLE_MODE) {
+  app.setPath('userData', path.dirname(process.execPath));
+} else {
+  app.setPath('userData', path.join(app.getPath('appData'), 'sysmon'));
+}
 // Identité Windows : icône correcte dans la barre des tâches (pas de carré vide)
 app.setAppUserModelId('com.lostinthebugs.sysmon');
 
@@ -163,13 +172,45 @@ function rebuildTrayMenu() {
   tray.setContextMenu(menu);
 }
 
+// --- autostart (démarrage au login) -------------------------------------------
+function applyAutoStart(cfg) {
+  const on = !!cfg.autoStart;
+  try {
+    if (process.platform === 'linux') {
+      const dir = path.join(os.homedir(), '.config', 'autostart');
+      const file = path.join(dir, 'sysmon.desktop');
+      if (on) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=SysMon\nExec="${process.execPath}" --no-sandbox\nX-GNOME-Autostart-enabled=true\nComment=SysMon system monitor\n`);
+        logger.info('main', 'autostart enabled', file);
+      } else if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        logger.info('main', 'autostart disabled');
+      }
+    } else {
+      app.setLoginItemSettings({ openAtLogin: on, path: process.execPath });
+      logger.info('main', 'autostart', on ? 'enabled' : 'disabled');
+    }
+  } catch (e) {
+    logger.warn('main', 'autostart error:', e);
+  }
+}
+
 // ------------------------------------------------------------ IPC handlers --
 function applyMode(cfg) {
   masterServer.stop();
   slaveClient.stop();
   try {
     if (cfg.mode === 'master') {
-      masterServer.start({ getSnapshot: () => latestSnapshot, onChange: () => {} });
+      masterServer.start({
+        getSnapshot: () => latestSnapshot,
+        onChange: () => {
+          // Le widget du master suit l'état des slaves (résumé CPU/RAM/temp)
+          if (widgetWin && !widgetWin.isDestroyed()) {
+            widgetWin.webContents.send('slaves', masterServer.listSlaves());
+          }
+        }
+      });
       logger.info('main', 'master server started on port', cfg.port);
     } else if (cfg.mode === 'slave') {
       slaveClient.start(() => latestSnapshot);
@@ -181,10 +222,22 @@ function applyMode(cfg) {
   rebuildTrayMenu();
 }
 
-ipcMain.handle('config:get', () => config.load());
+// Config poussée par le maître au slave (modules, cadence, logLevel)
+slaveClient.onConfig(clean => {
+  const cfg = config.load();
+  if (clean.modules) collectors.setEnabled(cfg.modules);
+  logger.info('slave', 'remote config from master:', JSON.stringify(clean));
+  // Refléter dans les fenêtres ouvertes (thème inchangé, mais modules…)
+  for (const w of [widgetWin, settingsWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send('config', cfg);
+  }
+});
+
+ipcMain.handle('config:get', () => ({ ...config.load(), portable: PORTABLE_MODE, version: pkg.version }));
 ipcMain.handle('config:set', (_e, patch) => {
   const next = config.set(patch);
   applyMode(next);
+  applyAutoStart(next);
   // Restaurer l'icône radar si le mode barre est désactivé
   if (!(next.barMode || {}).enabled && tray) {
     tray.setImage(nativeImage.createFromPath(APP_ICON));
@@ -238,6 +291,7 @@ app.whenReady().then(() => {
   createWidgetWindow();
   createTray();
   applyMode(cfg);
+  applyAutoStart(cfg);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWidgetWindow();

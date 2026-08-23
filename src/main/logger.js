@@ -10,14 +10,29 @@ const config = require('./config');
 
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 const MAX_BUFFER = 500;
+const MAX_FILE_BYTES = 1024 * 1024; // rotation à 1 Mo
 
 let entries = [];
 let nextId = 1;
 let drainedUpTo = 0;
 let fileLog = null;
+let writesSinceCheck = 0;
 
 function logPath() {
   return path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
+}
+
+// Rotation : sysmon-debug.log → .1, .1 → .2 (2 archives conservées)
+function rotateIfNeeded() {
+  writesSinceCheck++;
+  if (writesSinceCheck < 50) return;
+  writesSinceCheck = 0;
+  try {
+    const st = fs.statSync(fileLog);
+    if (st.size <= MAX_FILE_BYTES) return;
+    try { fs.renameSync(fileLog + '.1', fileLog + '.2'); } catch { /* pas d'archive .1 */ }
+    fs.renameSync(fileLog, fileLog + '.1'); // le prochain append crée un nouveau log
+  } catch { /* pas encore de fichier */ }
 }
 
 function effectiveLevel() {
@@ -40,6 +55,7 @@ function log(level, tag, ...args) {
     if (!fileLog) fileLog = logPath();
     fs.mkdirSync(path.dirname(fileLog), { recursive: true });
     fs.appendFileSync(fileLog, `[${now.toISOString()}] [${level}] [${tag}] ${msg}\n`);
+    rotateIfNeeded();
   } catch { /* le logging ne doit jamais planter l'appli */ }
 }
 

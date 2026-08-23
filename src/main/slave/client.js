@@ -19,8 +19,10 @@ let reconnectTimer = null;
 let getSnapshot = null;
 let discoveredMaster = null;
 let statusListeners = [];
+let configListeners = [];
 let discovering = false;
 let rejected = false;
+let syncMode = 'push';
 
 // Broadcasts de sous-réseau (multi-interfaces, plus fiable que 255.255.255.255 seul)
 function subnetBroadcasts() {
@@ -69,6 +71,32 @@ function broadcastDiscovery() {
 function notifyStatus(status, extra) {
   dlog('status →', status, extra ? JSON.stringify(extra) : '');
   for (const l of statusListeners) l({ status, ...extra });
+}
+
+// Config poussée par le master (modules, cadence, niveau de logs, syncMode).
+// Seuls ces champs sont acceptés — jamais mode/masterIp (pas de boucle).
+const REMOTE_ACCEPTED = ['modules', 'pushIntervalMs', 'logLevel', 'syncMode'];
+function applyRemoteConfig(cfgPatch, sock) {
+  const clean = {};
+  for (const k of REMOTE_ACCEPTED) if (cfgPatch[k] !== undefined) clean[k] = cfgPatch[k];
+  if (!Object.keys(clean).length) return;
+  dlog('remote config applied:', JSON.stringify(clean));
+  config.set(clean);
+  if (clean.syncMode) syncMode = clean.syncMode;
+  // Redémarrer le push avec la nouvelle cadence
+  const cfg = config.load();
+  if (timer) { clearInterval(timer); timer = null; }
+  if (sock && sock.readyState === WebSocket.OPEN) {
+    timer = setInterval(() => {
+      if (ws !== sock) return;
+      const snap = getSnapshot ? getSnapshot() : null;
+      if (sock.readyState !== WebSocket.OPEN) return;
+      if (syncMode !== 'pull' && snap) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      const logs = logger.drain();
+      if (logs.length) sock.send(JSON.stringify({ type: 'logs', logs }));
+    }, cfg.pushIntervalMs);
+  }
+  for (const l of configListeners) l(clean);
 }
 
 // Ré-découverte du master si l'IP n'est pas configurée en dur :
@@ -130,7 +158,8 @@ function connect() {
       if (ws !== sock) return;
       const snap = getSnapshot ? getSnapshot() : null;
       if (sock.readyState !== WebSocket.OPEN) return;
-      if (snap) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      // En mode 'pull', c'est le master qui demande (pas de push périodique)
+      if (syncMode !== 'pull' && snap) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
       // Logs non encore envoyés → centralisés chez le master
       const logs = logger.drain();
       if (logs.length) sock.send(JSON.stringify({ type: 'logs', logs }));
@@ -147,6 +176,14 @@ function connect() {
         // Le master a changé notre statut (validation manuelle / rejet)
         notifyStatus('validated', { status: msg.status, id: msg.id });
         if (msg.status === 'rejected') { rejected = true; disconnect(); }
+      } else if (msg.type === 'config' && msg.config) {
+        applyRemoteConfig(msg.config, sock);
+      } else if (msg.type === 'pull') {
+        // Le master demande un snapshot immédiat (mode pull/both)
+        const snap = getSnapshot ? getSnapshot() : null;
+        if (snap && sock.readyState === WebSocket.OPEN) {
+          sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
+        }
       }
     } catch { /* ignore */ }
   });
@@ -203,5 +240,6 @@ function stop() {
 }
 
 function onStatus(cb) { statusListeners.push(cb); }
+function onConfig(cb) { configListeners.push(cb); }
 
-module.exports = { start, stop, onStatus };
+module.exports = { start, stop, onStatus, onConfig };

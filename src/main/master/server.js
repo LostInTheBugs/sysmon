@@ -24,6 +24,7 @@ let server = null;
 let wss = null;
 let udpSock = null;
 let snapshotsTimer = null;
+let pullTimer = null;
 let slaves = new Map();   // id -> { id, name, hostname, platform, version, ip, status, lastSeen, snapshot }
 let slaveLogs = new Map(); // slaveId -> [entries] (logs centralisés des slaves)
 let dashboards = new Set();
@@ -49,10 +50,17 @@ function listSlaves() {
   return [...slaves.values()].map(s => ({
     id: s.id, name: s.name, hostname: s.hostname, platform: s.platform,
     version: s.version, ip: s.ip, status: s.status, lastSeen: s.lastSeen,
-    connected: s.connected, snapshot: s.snapshot
+    connected: !!s.connected, remoteConfig: s.remoteConfig || null,
+    // Résumé compact pour le widget/dashboard : dernière valeurs connues
+    summary: s.snapshot ? {
+      ts: s.snapshot.timestamp,
+      cpu: s.snapshot.modules && s.snapshot.modules.cpu && s.snapshot.modules.cpu.ok ? s.snapshot.modules.cpu.usage : null,
+      mem: s.snapshot.modules && s.snapshot.modules.memory && s.snapshot.modules.memory.ok ? s.snapshot.modules.memory.usagePct : null,
+      temp: s.snapshot.modules && s.snapshot.modules.sensors && s.snapshot.modules.sensors.ok ? s.snapshot.modules.sensors.cpuTemp : null
+    } : null,
+    snapshot: s.snapshot
   }));
 }
-
 // --- Logs centralisés --------------------------------------------------------
 function appendSlaveLogs(id, logs) {
   let buf = slaveLogs.get(id);
@@ -94,7 +102,7 @@ function upsertSlave(hello, ip) {
   let s = [...slaves.values()].find(x => x.name === hello.name && x.hostname === hello.hostname);
   if (!s) {
     const id = crypto.randomUUID();
-    s = { id, name: hello.name, hostname: hello.hostname, platform: hello.platform, version: hello.version, ip, status: 'pending', lastSeen: Date.now(), connected: true, snapshot: null };
+    s = { id, name: hello.name, hostname: hello.hostname, platform: hello.platform, version: hello.version, ip, status: 'pending', lastSeen: Date.now(), connected: true, snapshot: null, remoteConfig: null };
     slaves.set(id, s);
   } else {
     s.ip = ip;
@@ -107,6 +115,48 @@ function upsertSlave(hello, ip) {
   saveSlaves();
   broadcastSlaves();
   return s;
+}
+
+// --- Config à distance des slaves -------------------------------------------
+// Champs acceptés (le slave ne reçoit jamais mode/masterIp — pas de boucle)
+const REMOTE_KEYS = ['modules', 'pushIntervalMs', 'logLevel', 'syncMode'];
+
+function pushConfig(s) {
+  if (!s || !wss) return;
+  const cfg = config.load();
+  const payload = { type: 'config', config: { syncMode: cfg.syncMode, ...(s.remoteConfig || {}) } };
+  for (const ws of wss.clients) {
+    if (ws.slaveId === s.id) {
+      try { ws.send(JSON.stringify(payload)); } catch { /* ignore */ }
+    }
+  }
+}
+
+function setSlaveConfig(id, patch) {
+  const s = slaves.get(id);
+  if (!s) return false;
+  const clean = {};
+  for (const k of REMOTE_KEYS) if (patch[k] !== undefined) clean[k] = patch[k];
+  s.remoteConfig = Object.keys(clean).length ? { ...(s.remoteConfig || {}), ...clean } : null;
+  saveSlaves();
+  broadcastSlaves();
+  if (s.status === 'approved') pushConfig(s);
+  return true;
+}
+
+// --- Mode pull : le master demande le snapshot au lieu d'attendre le push ----
+function pullLoop() {
+  const cfg = config.load();
+  if (cfg.syncMode === 'push') return;
+  if (!wss) return;
+  for (const s of slaves.values()) {
+    if (s.status !== 'approved') continue;
+    for (const ws of wss.clients) {
+      if (ws.slaveId === s.id) {
+        try { ws.send(JSON.stringify({ type: 'pull' })); } catch { /* ignore */ }
+      }
+    }
+  }
 }
 
 function broadcastSlaves() {
@@ -123,6 +173,8 @@ function broadcastSnapshots() {
   }
   const payload = JSON.stringify({ type: 'snapshots', hosts });
   for (const d of dashboards) if (d.readyState === 1) d.send(payload);
+  // Le widget du master suit les slaves (résumé) — 1 notification / tick max
+  if (onSlavesChange) onSlavesChange();
 }
 
 function start({ getSnapshot: gs, onChange }) {
@@ -136,8 +188,13 @@ function start({ getSnapshot: gs, onChange }) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     // --- API REST ---
     if (url.pathname === '/api/status') {
+      const cfg = config.load();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ mode: 'master', version: require('../../../package.json').version, slaves: listSlaves() }));
+      res.end(JSON.stringify({
+        mode: 'master', version: require('../../../package.json').version,
+        language: cfg.language || 'auto', syncMode: cfg.syncMode || 'push',
+        slaves: listSlaves()
+      }));
       return;
     }
     if (url.pathname.startsWith('/api/slaves/')) {
@@ -152,6 +209,23 @@ function start({ getSnapshot: gs, onChange }) {
     if (url.pathname === '/api/slaves') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(listSlaves()));
+      return;
+    }
+    if (url.pathname === '/api/slave-config' && req.method === 'POST') {
+      // Config à distance d'un slave : { id, config: { modules?, pushIntervalMs?, logLevel? } }
+      let body = '';
+      req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const { id, config: patch } = JSON.parse(body || '{}');
+          const ok = patch && setSlaveConfig(id, patch);
+          res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: !!ok }));
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'bad request' }));
+        }
+      });
       return;
     }
     if (url.pathname === '/api/logs') {
@@ -209,6 +283,8 @@ function start({ getSnapshot: gs, onChange }) {
         ws.slaveId = s.id;
         dlog('hello from slave', s.name, '(' + ip + ') → status', s.status);
         ws.send(JSON.stringify({ type: 'welcome', status: s.status, id: s.id, pushIntervalMs: config.load().pushIntervalMs }));
+        // Pousser la config distante (syncMode + remoteConfig) dès la connexion
+        if (s.status === 'approved') pushConfig(s);
       } else if (msg.type === 'snapshot' && ws.slaveId) {
         const s = slaves.get(ws.slaveId);
         if (s && s.status === 'approved') {
@@ -247,6 +323,8 @@ function start({ getSnapshot: gs, onChange }) {
   server.listen(cfg.port, '0.0.0.0', () => {
     // Broadcast régulier des snapshots vers les dashboards
     snapshotsTimer = setInterval(broadcastSnapshots, cfg.pushIntervalMs);
+    // Mode pull / both : le master demande régulièrement les snapshots
+    if (cfg.syncMode !== 'push') pullTimer = setInterval(pullLoop, cfg.pushIntervalMs);
   });
 
   // --- Découverte UDP : répond aux broadcasts SYSMON_DISCOVER des slaves ---
@@ -270,9 +348,10 @@ function start({ getSnapshot: gs, onChange }) {
 function stop() {
   if (wss) { for (const ws of wss.clients) ws.terminate(); wss.close(); wss = null; }
   if (snapshotsTimer) { clearInterval(snapshotsTimer); snapshotsTimer = null; }
+  if (pullTimer) { clearInterval(pullTimer); pullTimer = null; }
   if (server) { server.close(); server = null; }
   if (udpSock) { try { udpSock.close(); } catch {} udpSock = null; }
   slaveLogs.clear();
 }
 
-module.exports = { start, stop, listSlaves, setSlaveStatus, getLogs };
+module.exports = { start, stop, listSlaves, setSlaveStatus, setSlaveConfig, getLogs };

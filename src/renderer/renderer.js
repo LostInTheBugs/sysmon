@@ -7,10 +7,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 let config = { modules: {}, mode: 'standalone' };
 let histData = null;
+let lastSnap = null;
+let slavesList = [];
 
 async function init() {
-  content.innerHTML = '<div class="loading">Collecting system info…</div>';
+  content.innerHTML = '<div class="loading">' + (window.sysmonI18n ? sysmonI18n.t('widget.loading') : 'Collecting system info…') + '</div>';
   config = await window.sysmon.getConfig();
+  if (window.sysmonI18n) sysmonI18n.setLang(config.language);
   applyTheme(config);
   $('#mode-badge').textContent = config.mode;
   $('#mode-badge').className = config.mode;
@@ -21,7 +24,8 @@ async function init() {
     refreshHistory();
   });
   window.sysmon.onSnapshot(render);
-  window.sysmon.onConfig(cfg => { config = cfg; applyTheme(cfg); render(null); });
+  window.sysmon.onSlaves(list => { slavesList = list; render(lastSnap); });
+  window.sysmon.onConfig(cfg => { config = cfg; applyTheme(cfg); render(lastSnap); });
   window.sysmon.refresh();
   // En mode courbes, on recharge l'historique périodiquement
   setInterval(refreshHistory, 5000);
@@ -243,11 +247,32 @@ function renderHistory() {
   }
   if (mods.sensors) html += chartSection('Temperature', '', s.temp, { suffix: '°C', digits: 1, cls: 'temp' });
   if (mods.battery) html += chartSection('Battery', '', s.batt, { suffix: '%', digits: 0, cls: 'batt' });
+  html += slavesSection();
   content.innerHTML = html || '<div class="loading">No modules enabled…</div>';
   console.log('[renderer] history render ok');
 }
 
+// Bloc SLAVES (visible uniquement sur le master) : état + résumé de chaque slave
+function slavesSection() {
+  if (config.mode !== 'master' || !slavesList.length) return '';
+  const t = window.sysmonI18n ? sysmonI18n.t : k => k;
+  const rows = slavesList.map(s => {
+    const dot = s.connected ? 'on' : '';
+    const vals = [];
+    if (s.summary) {
+      if (s.summary.cpu != null) vals.push('CPU ' + s.summary.cpu + '%');
+      if (s.summary.mem != null) vals.push('RAM ' + s.summary.mem + '%');
+      if (s.summary.temp != null) vals.push(s.summary.temp + '°C');
+    }
+    const sub = s.status === 'pending' ? t('slaves.pending') : vals.join(' · ') || (s.status === 'approved' ? t('slaves.waiting') : s.status);
+    return `<div class="row"><span class="dot ${dot}"></span><span class="lbl">${esc(s.name)}</span><span class="val ${s.status === 'pending' ? 'warn' : ''}">${esc(sub)}</span></div>`;
+  }).join('');
+  return section(t('slaves.title'), slavesList.length + (slavesList.length > 1 ? ' machines' : ' machine'), rows);
+}
+
 function render(snap) {
+  if (snap) lastSnap = snap;
+  snap = lastSnap;
   if (config.chartMode === 'history') { renderHistory(); return; }
   try {
     const m = snap.modules || {};
@@ -266,6 +291,7 @@ function render(snap) {
     if (mods.connectivity) html += connectivitySection(m.connectivity);
     if (mods.llm) html += llmSection(m.llm);
     if (mods.vms) html += vmsSection(m.vms);
+    html += slavesSection();
     content.innerHTML = html || '<div class="loading">No modules enabled…</div>';
     console.log('[renderer] render ok, snapshot', new Date(snap.timestamp).toISOString());
   } catch (e) {

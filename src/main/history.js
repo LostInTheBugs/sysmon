@@ -4,12 +4,51 @@
 //   { ts, cpu, cpuSpeed, mem, gpu, netRx, netTx, temp, batt }
 // - Slave : enregistre ses propres snapshots (widget en mode courbes)
 // - Master : enregistre le sien + ceux reçus des slaves (dashboard)
+// Persisté sur disque (userData/history.json) : chargé au démarrage,
+// sauvegardé avec un debounce de 15 s pour limiter les écritures.
 
+const fs = require('fs');
+const path = require('path');
 const config = require('./config');
 
 const MAX_POINTS = 3600; // garde-fou absolu (60 min @ 1 s)
+const SAVE_DEBOUNCE_MS = 15000;
 
 let buffers = new Map(); // host -> [sample]
+let saveTimer = null;
+
+function historyPath() {
+  return path.join(path.dirname(config.configPath()), 'history.json');
+}
+
+function load() {
+  try {
+    const raw = fs.readFileSync(historyPath(), 'utf8');
+    const data = JSON.parse(raw);
+    const win = (config.load().historyMinutes || 30) * 60 * 1000;
+    const now = Date.now();
+    for (const [host, samples] of Object.entries(data)) {
+      if (!Array.isArray(samples)) continue;
+      buffers.set(host, samples.filter(s => s && s.ts && now - s.ts <= win).slice(-MAX_POINTS));
+    }
+  } catch { /* pas de fichier ou corrompu */ }
+}
+
+function flush() {
+  try {
+    const out = {};
+    for (const [host, buf] of buffers) if (buf.length) out[host] = buf;
+    fs.mkdirSync(path.dirname(historyPath()), { recursive: true });
+    fs.writeFileSync(historyPath(), JSON.stringify(out));
+  } catch { /* non-fatal */ }
+}
+
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; flush(); }, SAVE_DEBOUNCE_MS);
+}
+
+load();
 
 function sampleFrom(snap) {
   const m = snap.modules || {};
@@ -54,6 +93,7 @@ function record(host, snap) {
     buf.push(s);
     const max = Math.min(MAX_POINTS, Math.max(60, Math.round((config.load().historyMinutes || 30) * 60 / (config.load().pushIntervalMs / 1000))));
     if (buf.length > max) buf.splice(0, buf.length - max);
+    scheduleSave();
   } catch { /* non-fatal */ }
 }
 
@@ -76,4 +116,4 @@ function hosts() { return [...buffers.keys()]; }
 
 function reset() { buffers.clear(); }
 
-module.exports = { record, series, last, hosts, reset, sampleFrom };
+module.exports = { record, series, last, hosts, reset, sampleFrom, flush, historyPath };

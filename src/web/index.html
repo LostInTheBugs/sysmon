@@ -7,30 +7,69 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
+  <div class="banner">
     <h1>SYSMON <span class="thin">DASHBOARD</span></h1>
     <div class="header-right">
-      <button id="btn-logs" title="Centralized logs">LOGS</button>
-      <button id="btn-curves" title="Historical curves">📈</button>
-      <button id="btn-theme" title="Theme">◐</button>
+      <button id="btn-logs" data-i18n="dash.logs" title="Centralized logs">LOGS</button>
+      <button id="btn-curves" data-i18n-title="dash.curves" title="Historical curves">📈</button>
+      <button id="btn-theme" data-i18n-title="dash.theme" title="Theme">◐</button>
       <div id="conn" class="conn">connecting…</div>
     </div>
-  </header>
-  <main id="hosts"></main>
-  <section id="logs-panel" class="hidden">
-    <div class="logs-toolbar">
-      <span class="logs-title">CENTRALIZED LOGS</span>
-      <select id="log-host"><option value="">all hosts</option></select>
+  </div>
+
+  <div id="pending-bar" class="pending-bar hidden">
+    <span class="pending-title" data-i18n="dash.pending">Slaves pending approval</span>
+    <div id="pending-actions"></div>
+  </div>
+
+  <main id="hosts" class="hosts"></main>
+
+  <div id="logs-panel" class="logs hidden">
+    <div class="logs-head">
+      <span class="logs-title" data-i18n="dash.logsTitle">Centralized logs</span>
+      <span id="logs-count" class="logs-count"></span>
+      <select id="log-host"></select>
       <select id="log-level">
         <option value="debug">debug</option>
         <option value="info">info</option>
         <option value="warn">warn</option>
         <option value="error">error</option>
       </select>
-      <span id="logs-count" class="logs-count"></span>
     </div>
-    <div id="logs" class="logs"><div class="logs-empty">No logs yet…</div></div>
-  </section>
+    <div id="log-lines" class="log-lines"><div class="log-line"><span class="m" data-i18n="dash.logsEmpty">No logs yet…</span></div></div>
+  </div>
+
+  <!-- Modal config à distance d'un slave -->
+  <div id="cfg-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="cfg-title" data-i18n="dash.configTitle">Slave configuration</h3>
+      <div id="cfg-slave-name" class="cfg-slave-name"></div>
+      <div class="cfg-section" data-i18n="dash.configModules">Modules</div>
+      <div id="cfg-modules" class="cfg-modules"></div>
+      <div class="cfg-section" data-i18n="dash.configInterval">Push interval</div>
+      <select id="cfg-interval">
+        <option value="1000">1 s</option>
+        <option value="2000">2 s</option>
+        <option value="5000">5 s</option>
+        <option value="10000">10 s</option>
+      </select>
+      <div class="cfg-section" data-i18n="dash.configLogLevel">Log level</div>
+      <select id="cfg-loglevel">
+        <option value="debug">debug</option>
+        <option value="info">info</option>
+        <option value="warn">warn</option>
+        <option value="error">error</option>
+      </select>
+      <div id="cfg-status" class="cfg-status"></div>
+      <div class="cfg-actions">
+        <button id="cfg-cancel" data-i18n="dash.configCancel">Cancel</button>
+        <button id="cfg-reset" class="danger" data-i18n="dash.configReset">Reset</button>
+        <button id="cfg-save" class="primary" data-i18n="dash.configSave">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -2,6 +2,36 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.015] — 2026-08-23
+
+### Added
+- **Remote slave configuration**: the master stores a per-slave config
+  (modules, push interval, log level — never mode/masterIp) in `slaves.json`,
+  pushes it over the WebSocket on connection/approval/change, and the slave
+  applies it live (collectors restart, push timer restarts). Dashboard UI: ⚙
+  button on each slave card → modal (module checkboxes, interval, log level,
+  reset). REST: `POST /api/slave-config`
+- **Master ↔ slave sync modes**: `push` (default), `pull` (the master requests
+  each snapshot, the slave stops pushing), `both`. Setting in the System card;
+  the master pushes the mode to slaves on connect
+- **Slaves block in the master widget**: the widget shows each slave with its
+  status and a compact summary (CPU %, RAM %, temperature) — live
+- **Resource history persisted to disk** (`userData/history.json`, debounced
+  15 s, loaded at startup) — curves survive app restarts
+- **Auto-start at login** (System card): Windows/macOS login item,
+  Linux `~/.config/autostart/sysmon.desktop`
+- **Portable mode**: drop an empty `portable.json` next to the executable →
+  config, slaves, history and logs live in the same folder (USB stick)
+- **i18n FR/EN**: settings window (full), widget chrome + slaves block,
+  web dashboard — language in Apparence (auto = system language, applied
+  live); the dashboard follows the master's language
+- **Log rotation**: `sysmon-debug.log` rotates at 1 MB (2 archives)
+
+### Tests
+- `scripts/test-remote-config.js`: master pushes config → slave applies
+  (all 9 tests passing)
+- `scripts/test-pull.js`: syncMode=pull — master requests, slave answers
+
 ## [2026.08.013] — 2026-08-23
 
 ### Added
