@@ -57,8 +57,9 @@ function sampleFrom(snap) {
     const usages = m.gpu.controllers.map(c => c.utilizationPct).filter(v => v != null);
     if (usages.length) gpu = Math.max(...usages);
   }
-  let netRx = 0, netTx = 0;
-  if (m.network && m.network.ok && m.network.interfaces) {
+  let netRx = null, netTx = null;
+  if (m.network && m.network.ok && m.network.interfaces && m.network.interfaces.length) {
+    netRx = 0; netTx = 0;
     for (const i of m.network.interfaces) {
       if (i.rxMBs != null) netRx += i.rxMBs;
       if (i.txMBs != null) netTx += i.txMBs;
@@ -70,11 +71,11 @@ function sampleFrom(snap) {
   return {
     ts: snap.timestamp || Date.now(),
     cpu,
-    cpuSpeed: m.cpu && m.cpu.ok && m.cpu.speed != null ? m.cpu.speed : null,
+    cpuSpeed: m.cpu && m.cpu.ok ? (m.cpu.speedLive != null ? m.cpu.speedLive : (m.cpu.speed != null ? m.cpu.speed : null)) : null,
     mem,
     gpu,
-    netRx: netRx || null,
-    netTx: netTx || null,
+    netRx, // 0 est une valeur valide (réseau au repos) — pas de `|| null`
+    netTx,
     temp: m.sensors && m.sensors.ok && m.sensors.cpuTemp != null ? m.sensors.cpuTemp : null,
     batt
   };

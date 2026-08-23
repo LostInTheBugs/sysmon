@@ -42,6 +42,19 @@ function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
+// Normalise les valeurs énumérées (répare une config corrompue — ex. le bug
+// 015 où le badge traduit était réécrit dans mode, donnant
+// "mode.mode.mode.mode.maitre").
+function normalize(v, allowed, def) {
+  if (v == null) return def;
+  const s = String(v).toLowerCase();
+  if (allowed.includes(s)) return s;
+  if (s.includes('maitre') || s.includes('master')) return 'master';
+  if (s.includes('esclave') || s.includes('slave')) return 'slave';
+  if (s.includes('autonome') || s.includes('standalone')) return 'standalone';
+  return def;
+}
+
 function load() {
   if (cache) return cache;
   try {
@@ -51,6 +64,13 @@ function load() {
   } catch {
     cache = { ...DEFAULTS, widget: { ...DEFAULTS.widget }, modules: { ...DEFAULTS.modules } };
   }
+  // Réparation des valeurs corrompues
+  cache.mode = normalize(cache.mode, ['standalone', 'master', 'slave'], 'standalone');
+  cache.syncMode = ['push', 'pull', 'both'].includes(cache.syncMode) ? cache.syncMode : 'push';
+  cache.chartMode = ['instant', 'history'].includes(cache.chartMode) ? cache.chartMode : 'instant';
+  cache.language = ['auto', 'fr', 'en'].includes(cache.language) ? cache.language : 'auto';
+  cache.logLevel = ['debug', 'info', 'warn', 'error'].includes(cache.logLevel) ? cache.logLevel : 'debug';
+  cache.theme = ['dark', 'light', 'amoled', 'compact'].includes(cache.theme) ? cache.theme : 'dark';
   return cache;
 }
 

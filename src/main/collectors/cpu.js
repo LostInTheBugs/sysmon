@@ -12,9 +12,10 @@ async function staticInfo() {
 
 async function collect() {
   try {
-    const [cpu, load] = await Promise.all([
+    const [cpu, load, curSpeed] = await Promise.all([
       staticInfo(),
-      si.currentLoad()
+      si.currentLoad(),
+      si.cpuCurrentSpeed().catch(() => null)
     ]);
     const la = os.loadavg();
     return {
@@ -23,6 +24,7 @@ async function collect() {
       cores: cpu.cores,
       physicalCores: cpu.physicalCores,
       speed: cpu.speed > 0 ? cpu.speed : null,
+      speedLive: curSpeed && curSpeed.avg > 0 ? Math.round(curSpeed.avg * 10) / 10 : null,
       loadAvg: Math.round(la[0] * 10) / 10,
       loadAvg5: Math.round(la[1] * 10) / 10,
       loadAvg15: Math.round(la[2] * 10) / 10,

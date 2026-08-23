@@ -2,6 +2,31 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.017] — 2026-08-23
+
+### Fixed
+- **History curves stuck on "collecting…"** (network, temperature):
+  - an idle network (0 MB/s) was stored as `null` (`netRx || null` bug) — zero
+    is now a valid sample → the network curve draws even at rest
+  - CPU frequency now uses the **live** speed (`si.cpuCurrentSpeed`) instead of
+    the static base clock (often 0/absent on Windows and VMs)
+  - temperature falls back to the max core temperature on Windows when the
+    main sensor is unavailable (no admin rights)
+- **Settings mode badge corrupted**: the Save button read the mode from the
+  badge text, which is translated since 015 ("Maître"/"Master") — each save
+  wrapped it further (`mode.mode.mode.mode.maitre`). The mode now comes from
+  the selected tile only; a config normalizer heals corrupted values on load
+  (mode, syncMode, chartMode, language, logLevel, theme)
+- **Windows taskbar icon when the widget is minimized**: the `.ico` is now
+  generated with proper Windows ICO encoding (7 sizes, PIL) and the icon is
+  also applied via `setIcon()` on both windows
+- Slaves list in the settings window now works with a translated badge
+  (it checked the raw text `master`)
+
+### Tests
+- `scripts/test-history-zero.js`: idle network must produce a 0 sample
+  (10/10 passing)
+
 ## [2026.08.015] — 2026-08-23
 
 ### Added

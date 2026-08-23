@@ -64,6 +64,10 @@ function createWidgetWindow() {
     }
   });
   widgetWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  // Icône explicite (Windows : le .ico doit être chargé par setIcon pour la
+  // barre des tâches quand la fenêtre est réduite)
+  const winIcon = nativeImage.createFromPath(APP_ICON);
+  if (!winIcon.isEmpty()) widgetWin.setIcon(winIcon);
   widgetWin.webContents.on('console-message', (_e, _level, message) => logger.debug('renderer', message));
   widgetWin.on('closed', () => { widgetWin = null; });
 }
@@ -85,6 +89,8 @@ function openSettings() {
     }
   });
   settingsWin.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
+  const winIcon = nativeImage.createFromPath(APP_ICON);
+  if (!winIcon.isEmpty()) settingsWin.setIcon(winIcon);
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 

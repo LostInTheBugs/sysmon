@@ -57,9 +57,12 @@ async function collect() {
     }
     for (const d of disks) if (smartCache[d.device]) smart.push(smartCache[d.device].data);
 
+    // Windows : si.cpuTemperature().main est souvent null sans droits admin —
+    // repli sur le max des coeurs si disponible
+    const mainTemp = temp.main != null ? temp.main : ((temp.cores || []).length ? Math.max(...temp.cores) : null);
     return {
       ok: true,
-      cpuTemp: temp.main != null ? Math.round(temp.main * 10) / 10 : null,
+      cpuTemp: mainTemp != null ? Math.round(mainTemp * 10) / 10 : null,
       cpuTempMax: temp.max != null ? Math.round(temp.max * 10) / 10 : null,
       coresTemp: (temp.cores || []).map(c => Math.round(c * 10) / 10),
       fans: readFans(),

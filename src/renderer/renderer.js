@@ -77,7 +77,7 @@ function cpuSection(m) {
     ${row('Usage', m.usage + '%', m.usage > 85 ? 'bad' : m.usage > 65 ? 'warn' : '')}
     ${bar(m.usage)}
     ${row('Load avg', m.loadAvg)}
-    ${row('Cores', `${m.cores} (${m.physicalCores} phys)${m.speed ? ' @ ' + m.speed + ' GHz' : ''}`)}
+    ${row('Cores', `${m.cores} (${m.physicalCores} phys)${m.speedLive || m.speed ? ' @ ' + (m.speedLive || m.speed) + ' GHz' : ''}`)}
     ${row('Temp', m.temp != null ? m.temp + '°C' : '—', tempCls(m.temp))}
     <div class="mini">${coreBars}</div>
   `);

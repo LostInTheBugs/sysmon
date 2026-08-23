@@ -9,6 +9,7 @@ const MODULE_LABELS = {
 
 let config = null;
 let lastSlavesSig = '';
+let currentMode = 'standalone'; // source de vérité du mode (jamais le texte du badge)
 const $ = sel => document.querySelector(sel);
 
 async function load() {
@@ -35,7 +36,6 @@ async function load() {
   // i18n : langue + étiquettes
   sysmonI18n.setLang(config.language || 'auto');
   sysmonI18n.apply(document);
-  $('#mode-badge').textContent = sysmonI18n.t('mode.' + config.mode);
   applyTheme(config);
 }
 
@@ -43,7 +43,7 @@ async function load() {
 $('#language').addEventListener('change', () => {
   sysmonI18n.setLang($('#language').value);
   sysmonI18n.apply(document);
-  $('#mode-badge').textContent = sysmonI18n.t('mode.' + (config.mode || 'standalone'));
+  $('#mode-badge').textContent = sysmonI18n.t('mode.' + currentMode);
   renderModules();
 });
 
@@ -59,7 +59,8 @@ function applyTheme(cfg) {
 }
 
 function updateModeUI(mode) {
-  $('#mode-badge').textContent = mode;
+  currentMode = mode;
+  $('#mode-badge').textContent = sysmonI18n.t('mode.' + mode);
   $('#mode-badge').className = 'badge ' + mode;
   document.querySelectorAll('.mode').forEach(el => {
     el.classList.toggle('active', el.dataset.mode === mode);
@@ -82,7 +83,7 @@ function renderModules() {
 
 async function refreshSlaves() {
   const box = $('#slaves');
-  if ($('#mode-badge').textContent !== 'master') {
+  if (currentMode !== 'master') {
     box.innerHTML = '<div class="hint">Visible uniquement en mode maître.</div>';
     return;
   }
@@ -135,7 +136,7 @@ $('#save').addEventListener('click', async () => {
     const modules = {};
     document.querySelectorAll('input[data-module]').forEach(cb => { modules[cb.dataset.module] = cb.checked; });
     config = await window.sysmon.setConfig({
-      mode: $('#mode-badge').textContent,
+      mode: (document.querySelector('.mode.active') || {}).dataset?.mode || currentMode,
       webAccess: $('#webAccess').checked,
       autoApproveSlaves: $('#autoApproveSlaves').checked,
       port: parseInt($('#port').value, 10) || 8597,
@@ -154,7 +155,7 @@ $('#save').addEventListener('click', async () => {
     });
     status.className = 'status ok';
     status.textContent = sysmonI18n.t('status.saved');
-    $('#mode-badge').textContent = sysmonI18n.t('mode.' + config.mode);
+    $('#mode-badge').textContent = sysmonI18n.t('mode.' + currentMode);
     refreshSlaves();
   } catch (e) {
     status.className = 'status err';
