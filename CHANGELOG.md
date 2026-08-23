@@ -2,6 +2,21 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.019] — 2026-08-23
+
+### Fixed
+- **Network shows 0 MB/s on Windows even with traffic** (speedtest, downloads):
+  `si.networkStats()` and `si.networkInterfaces()` report different interface
+  names on Windows ("Ethernet" vs "Realtek PCIe GbE Family Controller") — the
+  name-based join failed and every interface read 0. New `matchStats()` joins
+  by exact name, adapter description (`ifaceName`) or normalized name
+  (case/spaces); a warning with the real names is logged if the join still
+  fails, so it can be diagnosed from the centralized logs
+
+### Tests
+- `scripts/test-network-match.js`: Windows name-mismatch cases
+  (11/11 passing)
+
 ## [2026.08.017] — 2026-08-23
 
 ### Fixed

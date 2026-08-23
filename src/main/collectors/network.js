@@ -59,6 +59,22 @@ async function wan() {
   }
 }
 
+// Jointure stats↔interfaces : sur Windows, si.networkStats() et
+// si.networkInterfaces() ne partagent pas le même nom d'interface
+// ("Ethernet" vs "Realtek PCIe GbE Family Controller"). On essaie plusieurs
+// correspondances : nom exact, ifaceName (description), nom sans espaces/casse.
+function matchStats(stats, iface, ifaceName) {
+  if (!Array.isArray(stats) || !stats.length) return null;
+  const norm = s => String(s || '').toLowerCase().replace(/[\s()#]+/g, '');
+  const target = norm(iface);
+  const targetName = norm(ifaceName);
+  return stats.find(x => x.iface === iface)
+    || (ifaceName ? stats.find(x => x.iface === ifaceName) : null)
+    || stats.find(x => norm(x.iface) === target)
+    || (ifaceName ? stats.find(x => norm(x.iface) === targetName) : null)
+    || null;
+}
+
 async function collect() {
   try {
     const [stats, ifaces, defGw, wanData] = await Promise.all([
@@ -70,9 +86,10 @@ async function collect() {
     const ifaceList = (ifaces || [])
       .filter(i => !i.internal && !i.virtual && (i.ip4 || i.ip6))
       .map(i => {
-        const s = (stats || []).find(x => x.iface === i.iface);
+        const s = matchStats(stats, i.iface, i.ifaceName);
         return {
           iface: i.iface,
+          ifaceName: i.ifaceName || null,
           type: i.type === 'wifi' ? 'Wi-Fi' : i.type === 'ethernet' ? 'Ethernet' : i.type,
           ip4: i.ip4, ip6: i.ip6, mac: i.mac,
           speed: i.speed ? `${i.speed} Mb/s` : null,
@@ -84,6 +101,14 @@ async function collect() {
           isDefault: defGw && defGw.iface === i.iface
         };
       });
+    // Diagnostic : si des stats existent mais qu'aucune interface ne matche,
+    // on log les vrais noms (utile si le matching échoue encore sur un système)
+    if ((stats || []).length && ifaceList.length && ifaceList.every(i => !i.rxMBs && !i.txMBs)) {
+      try {
+        const logger = require('../logger');
+        logger.warn('network', 'stats/iface join failed — stats names:', (stats || []).map(s => s.iface).join(' | '), '— iface names:', ifaceList.map(i => i.iface + (i.ifaceName ? ' (' + i.ifaceName + ')' : '')).join(' | '));
+      } catch { /* logger pas dispo (test) */ }
+    }
     return {
       ok: true,
       interfaces: ifaceList,
@@ -96,4 +121,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, name: 'network' };
+module.exports = { collect, matchStats, name: 'network' };
