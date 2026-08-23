@@ -104,17 +104,24 @@ function connect() {
   const port = discoveredMaster && !cfg.masterIp ? discoveredMaster.port : cfg.port;
   const url = `ws://${target}:${port}/ws`;
   notifyStatus('connecting', { url });
+  let sock;
   try {
-    ws = new WebSocket(url);
+    sock = new WebSocket(url);
+    ws = sock;
   } catch (e) {
     dlog('websocket creation failed:', e.message);
     ws = null;
     scheduleReconnect();
     return;
   }
-  ws.on('open', () => {
+  // Chaque handler est lié à SA socket (sock) et vérifie qu'elle est toujours
+  // la socket courante : après un stop/start (ex. Enregistrer dans les
+  // paramètres), les événements de l'ancienne socket ne doivent pas toucher
+  // l'état de la nouvelle (crash ws.send sur null, timer tué, reconnexion).
+  sock.on('open', () => {
+    if (ws !== sock) { try { sock.close(); } catch { /* ignore */ } return; }
     notifyStatus('connected', { url });
-    ws.send(JSON.stringify({
+    sock.send(JSON.stringify({
       type: 'hello',
       name: os.hostname(),
       hostname: os.hostname(),
@@ -122,11 +129,13 @@ function connect() {
       version: pkg.version
     }));
     timer = setInterval(() => {
+      if (ws !== sock) return;
       const snap = getSnapshot ? getSnapshot() : null;
-      if (snap && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      if (snap && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: 'snapshot', data: snap }));
     }, cfg.pushIntervalMs);
   });
-  ws.on('message', raw => {
+  sock.on('message', raw => {
+    if (ws !== sock) return;
     try {
       const msg = JSON.parse(raw);
       if (msg.type === 'welcome') {
@@ -139,11 +148,13 @@ function connect() {
       }
     } catch { /* ignore */ }
   });
-  ws.on('error', e => {
+  sock.on('error', e => {
+    if (ws !== sock) return;
     dlog('websocket error:', e && e.message ? e.message : e);
     // 'close' suit toujours 'error' → c'est lui qui planifie la reconnexion
   });
-  ws.on('close', () => {
+  sock.on('close', () => {
+    if (ws !== sock) return; // vieille socket (stop/restart) → ne rien toucher
     if (timer) { clearInterval(timer); timer = null; }
     ws = null;
     notifyStatus('disconnected');

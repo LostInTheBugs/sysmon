@@ -2,6 +2,20 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.009] — 2026-08-23
+
+### Fixed
+- **Crash on Save in the settings window while the slave is connected**
+  (`TypeError: Cannot read properties of null (reading 'send')` in `client.js`):
+  clicking Save stops and restarts the slave; the old socket's `close` event then
+  reset the module-level `ws` to `null` after the new socket was created, so the
+  new socket's `open` handler crashed on `ws.send`. Every handler is now bound to
+  its own socket and checks it is still the current one — stale events from a
+  previous socket can no longer touch the new connection (this also protects the
+  snapshot timer from being killed by the old socket)
+- Regression test `scripts/test-restart.js` reproduces the exact scenario
+  (connected slave → stop/start) and passes
+
 ## [2026.08.007] — 2026-08-23
 
 ### Fixed
