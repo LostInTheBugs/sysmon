@@ -12,6 +12,7 @@ const os = require('os');
 const { WebSocketServer } = require('ws');
 const config = require('../config');
 const logger = require('../logger');
+const history = require('../history');
 
 const WEB_DIR = path.join(__dirname, '..', '..', 'web');
 const MAX_HOST_LOGS = 300;
@@ -164,6 +165,23 @@ function start({ getSnapshot: gs, onChange }) {
       res.end(JSON.stringify({ hosts }));
       return;
     }
+    if (url.pathname === '/api/history') {
+      // Historique des ressources : master + slaves (fenêtre en minutes)
+      const masterName = (getSnapshot && getSnapshot().host && getSnapshot().host.hostname) || 'master';
+      const host = url.searchParams.get('host');
+      const minutes = parseInt(url.searchParams.get('minutes'), 10) || config.load().historyMinutes || 30;
+      const keys = ['cpu', 'cpuSpeed', 'mem', 'gpu', 'netRx', 'netTx', 'temp', 'batt'];
+      const hosts = {};
+      const list = host ? [host === 'master' ? masterName : host] : [masterName, ...history.hosts().filter(h => h !== masterName)];
+      for (const h of list) {
+        const series = {};
+        for (const k of keys) series[k] = history.series(h, k, minutes);
+        hosts[h] = series;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ hosts }));
+      return;
+    }
     // --- Dashboard web ---
     let file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     file = path.normalize(file).replace(/^(\.\.[\/\\])+/, '');
@@ -196,6 +214,8 @@ function start({ getSnapshot: gs, onChange }) {
         if (s && s.status === 'approved') {
           s.snapshot = msg.data;
           s.lastSeen = Date.now();
+          // Historique du slave côté master (clé = hostname du snapshot, comme le dashboard)
+          history.record((msg.data.host && msg.data.host.hostname) || s.name, msg.data);
         }
       } else if (msg.type === 'logs' && ws.slaveId) {
         const s = slaves.get(ws.slaveId);

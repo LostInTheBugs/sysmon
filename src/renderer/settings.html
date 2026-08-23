@@ -63,6 +63,47 @@
       </div>
 
       <div class="card">
+        <h2>Affichage des graphiques</h2>
+        <div class="field"><label>Mode d'affichage</label>
+          <select id="chartMode">
+            <option value="instant">Instantané (valeurs)</option>
+            <option value="history">Courbes historiques</option>
+          </select>
+        </div>
+        <div class="hint">Bouton 📊/📈 en haut du widget pour basculer rapidement. En mode courbes, les graphiques montrent l'évolution sur la fenêtre d'historique.</div>
+      </div>
+
+      <div class="card">
+        <h2>Historique des ressources</h2>
+        <div class="field"><label>Enregistrer l'historique</label><span class="switch"><input type="checkbox" id="historyEnabled" /><span class="sl"></span></span></div>
+        <div class="field"><label>Fenêtre</label>
+          <select id="historyMinutes">
+            <option value="10">10 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 heure</option>
+            <option value="120">2 heures</option>
+          </select>
+        </div>
+        <div class="hint">En mémoire, sur chaque machine (slave : ses propres ressources — master : les siennes + celles reçues des slaves). Visible en mode courbes et sur le dashboard web.</div>
+      </div>
+
+      <div class="card">
+        <h2>Barre système (mode "dans la barre")</h2>
+        <div class="field"><label>Afficher une valeur en direct dans la barre</label><span class="switch"><input type="checkbox" id="barEnabled" /><span class="sl"></span></span></div>
+        <div class="field"><label>Valeur affichée</label>
+          <select id="barMetric">
+            <option value="cpu">CPU %</option>
+            <option value="mem">RAM %</option>
+            <option value="gpu">GPU %</option>
+            <option value="net">Réseau ↓/↑</option>
+            <option value="temp">Température °C</option>
+            <option value="batt">Batterie %</option>
+          </select>
+        </div>
+        <div class="hint">Windows : texte dans la zone de notification (icône SysMon avec la valeur). macOS : dans la barre de menu. Survolez pour le détail complet. Désactiver pour revenir à l'icône radar.</div>
+      </div>
+
+      <div class="card">
         <h2>Modules d'information</h2>
         <div class="grid" id="modules"></div>
       </div>

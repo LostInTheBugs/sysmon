@@ -2,6 +2,35 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.013] — 2026-08-23
+
+### Added
+- **Resource history** (in-memory, per machine): compact samples (CPU %, CPU
+  frequency, RAM %, GPU %, network ↓/↑, temperature, battery) recorded every
+  snapshot tick. Slave: its own resources. Master: its own + every approved
+  slave's. Exposed via `GET /api/history?host=&minutes=`. Window and
+  enable/disable configurable in settings (Historique card, 10 min – 2 h)
+- **Historical curves display mode** — second chart mode alongside the instant
+  one: area/line SVG charts per metric (CPU usage, CPU frequency, Memory, GPU,
+  Network ↓/↑, Temperature, Battery) in the widget and on the web dashboard
+  (📈 button per dashboard, 📊/📈 button in the widget title bar). The widget
+  chart mode is a setting (Affichage des graphiques) and can be toggled live
+  with the title-bar button
+- **"In the bar" mode** (like macOS menu-bar monitors): the tray icon on
+  Windows shows a live value (CPU %, RAM %, GPU %, network ↓/↑, temperature,
+  battery) rendered as text on the icon, updated every snapshot tick; the
+  tooltip shows the full summary. Metric and enable/disable configurable in
+  settings (Barre système card). Disabling restores the radar icon
+
+### Fixed
+- **Tray icon blank square on Windows**: the tray was fed a resized 16×16 PNG,
+  which Windows renders as an empty square. The tray now loads the real
+  multi-size `icon.ico` on Windows (PNG elsewhere)
+
+### Tests
+- `scripts/test-history.js`: slave snapshots are recorded by the master and
+  served through `/api/history` (all 7 tests passing)
+
 ## [2026.08.011] — 2026-08-23
 
 ### Added

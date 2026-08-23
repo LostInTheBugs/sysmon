@@ -22,6 +22,12 @@ async function load() {
   $('#masterIp').value = config.masterIp || '';
   $('#logLevel').value = config.logLevel || 'debug';
   $('#accent').value = config.accent || '#4fc3f7';
+  $('#chartMode').value = config.chartMode || 'instant';
+  $('#historyEnabled').checked = config.historyEnabled !== false;
+  $('#historyMinutes').value = String(config.historyMinutes || 30);
+  const bar = config.barMode || {};
+  $('#barEnabled').checked = !!bar.enabled;
+  $('#barMetric').value = bar.metric || 'cpu';
   applyTheme(config);
 }
 
@@ -121,6 +127,10 @@ $('#save').addEventListener('click', async () => {
       theme: document.body.dataset.theme || 'dark',
       accent: $('#accent').value,
       logLevel: $('#logLevel').value,
+      chartMode: $('#chartMode').value,
+      historyEnabled: $('#historyEnabled').checked,
+      historyMinutes: parseInt($('#historyMinutes').value, 10) || 30,
+      barMode: { enabled: $('#barEnabled').checked, metric: $('#barMetric').value },
       modules
     });
     status.className = 'status ok';

@@ -14,6 +14,13 @@ const DEFAULTS = {
   theme: 'dark',        // 'dark' | 'light' | 'amoled' | 'compact'
   accent: '#4fc3f7',    // couleur d'accent (widget, paramètres, dashboard)
   logLevel: 'debug',    // 'debug' | 'info' | 'warn' | 'error'
+  chartMode: 'instant', // 'instant' | 'history' (courbes)
+  historyEnabled: true,
+  historyMinutes: 30,   // fenêtre de l'historique en mémoire
+  barMode: {
+    enabled: false,     // mode "dans la barre" (tray texte Windows / menu bar macOS)
+    metric: 'cpu'       // 'cpu' | 'mem' | 'gpu' | 'net' | 'temp' | 'batt' | 'none'
+  },
   widget: {
     alwaysOnTop: true,
     opacity: 0.95,

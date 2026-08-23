@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('sysmon', {
   setSlave: (id, action) => ipcRenderer.invoke('slaves:set', id, action),
   openDashboard: () => ipcRenderer.invoke('open:dashboard'),
   openSettings: () => ipcRenderer.invoke('open:settings'),
-  refresh: () => ipcRenderer.invoke('sysinfo:refresh')
+  refresh: () => ipcRenderer.invoke('sysinfo:refresh'),
+  getHistory: () => ipcRenderer.invoke('history:get')
 });

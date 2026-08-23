@@ -6,6 +6,7 @@ const content = $('#content');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 let config = { modules: {}, mode: 'standalone' };
+let histData = null;
 
 async function init() {
   content.innerHTML = '<div class="loading">Collecting system info…</div>';
@@ -15,9 +16,23 @@ async function init() {
   $('#mode-badge').className = config.mode;
   $('#btn-settings').addEventListener('click', () => window.sysmon.openSettings());
   $('#btn-close').addEventListener('click', () => window.close());
+  $('#btn-charts').addEventListener('click', async () => {
+    await window.sysmon.setConfig({ chartMode: config.chartMode === 'history' ? 'instant' : 'history' });
+    refreshHistory();
+  });
   window.sysmon.onSnapshot(render);
-  window.sysmon.onConfig(cfg => { config = cfg; applyTheme(cfg); });
+  window.sysmon.onConfig(cfg => { config = cfg; applyTheme(cfg); render(null); });
   window.sysmon.refresh();
+  // En mode courbes, on recharge l'historique périodiquement
+  setInterval(refreshHistory, 5000);
+  refreshHistory();
+}
+
+async function refreshHistory() {
+  try {
+    histData = await window.sysmon.getHistory();
+    if (config.chartMode === 'history') render(null);
+  } catch { /* main pas encore prêt */ }
 }
 
 // --- thème / accent (appliqué en direct depuis les paramètres) ---------------
@@ -25,6 +40,8 @@ function applyTheme(cfg) {
   document.body.dataset.theme = cfg.theme || 'dark';
   document.body.classList.toggle('compact', cfg.theme === 'compact');
   document.body.style.setProperty('--accent', cfg.accent || '#4fc3f7');
+  $('#btn-charts').textContent = cfg.chartMode === 'history' ? '📈' : '📊';
+  $('#btn-charts').title = cfg.chartMode === 'history' ? 'Courbes historiques — clic pour instantané' : 'Instantané — clic pour courbes historiques';
 }
 
 // --- helpers d'affichage -----------------------------------------------------
@@ -179,7 +196,59 @@ function vmsSection(m) {
 }
 
 // --- rendu -------------------------------------------------------------------
+// Courbe SVG (aire + ligne + dernière valeur) depuis une série {ts, v}
+function svgChart(series, opts = {}) {
+  const { h = 60, max = null, digits = 0, suffix = '', cls = '' } = opts;
+  if (!series || series.length < 2) return '<div class="chart-empty">collecting…</div>';
+  const w = 320;
+  const pts = series.slice(-150);
+  const vals = pts.map(p => p.v);
+  const maxV = max != null ? max : (Math.max(...vals) || 1) * 1.15;
+  const minV = Math.min(0, ...vals);
+  const x = i => (i / (pts.length - 1)) * w;
+  const y = v => h - ((v - minV) / (maxV - minV)) * (h - 4) - 2;
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const area = `${line} L${w} ${h} L0 ${h} Z`;
+  const lastV = pts[pts.length - 1].v;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chart ${cls}">
+    <path class="fill" d="${area}"/>
+    <path class="line" d="${line}"/>
+    <text class="last" x="${w}" y="${h - 1}" text-anchor="end">${lastV.toFixed(digits)}${suffix}</text>
+  </svg>`;
+}
+
+function chartSection(title, hint, series, opts) {
+  return section(title, hint, svgChart(series, opts));
+}
+
+// Mode "courbes historiques" : un graphique par métrique des modules activés
+function renderHistory() {
+  const mods = config.modules || {};
+  const s = (histData && histData.series) || {};
+  const host = histData ? histData.host : '';
+  $('#hostname').textContent = host;
+  $('#uptime').textContent = '';
+  let html = '';
+  if (mods.cpu) {
+    html += chartSection('CPU usage', '', s.cpu, { suffix: '%', digits: 0 });
+    html += chartSection('CPU frequency', '', s.cpuSpeed, { suffix: ' GHz', digits: 2, cls: 'spd' });
+  }
+  if (mods.memory) html += chartSection('Memory', '', s.mem, { suffix: '%', digits: 0 });
+  if (mods.gpu) html += chartSection('GPU', '', s.gpu, { suffix: '%', digits: 0 });
+  if (mods.network) {
+    html += section('Network', '', `
+      <div class="legend"><span class="lg rx"></span>↓ in <span class="lg tx"></span>↑ out</div>
+      ${svgChart(s.netRx, { suffix: ' MB/s ↓', digits: 1, cls: 'rx' })}
+      ${svgChart(s.netTx, { suffix: ' MB/s ↑', digits: 1, cls: 'tx' })}`);
+  }
+  if (mods.sensors) html += chartSection('Temperature', '', s.temp, { suffix: '°C', digits: 1, cls: 'temp' });
+  if (mods.battery) html += chartSection('Battery', '', s.batt, { suffix: '%', digits: 0, cls: 'batt' });
+  content.innerHTML = html || '<div class="loading">No modules enabled…</div>';
+  console.log('[renderer] history render ok');
+}
+
 function render(snap) {
+  if (config.chartMode === 'history') { renderHistory(); return; }
   try {
     const m = snap.modules || {};
     $('#hostname').textContent = snap.host ? snap.host.hostname : '';

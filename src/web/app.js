@@ -69,6 +69,67 @@ logHostSel.addEventListener('change', renderLogs);
 logLevelSel.addEventListener('change', renderLogs);
 setInterval(() => { if (!logsPanel.classList.contains('hidden')) refreshLogs(); }, 3000);
 
+// --- courbes historiques par hôte ---------------------------------------------
+let historyData = null;
+let curvesMode = false;
+const HIST_KEYS = ['cpu', 'mem', 'gpu', 'netRx', 'netTx', 'temp'];
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/history?minutes=30');
+    historyData = await r.json();
+    if (curvesMode) refreshCurves();
+  } catch { /* master redémarrage */ }
+}
+function refreshCurves() {
+  // re-render les cartes avec les courbes (le prochain snapshot WS les réaffiche)
+  // → on force juste le prochain render à les inclure ; pas de re-render direct.
+}
+document.getElementById('btn-curves').addEventListener('click', () => {
+  curvesMode = !curvesMode;
+  document.getElementById('btn-curves').classList.toggle('active', curvesMode);
+  if (curvesMode) refreshHistory();
+  else refreshCurves();
+});
+setInterval(() => { if (curvesMode) refreshHistory(); }, 5000);
+refreshHistory();
+
+// Courbe SVG (même style que le widget)
+function svgChart(series, opts = {}) {
+  const { h = 52, max = null, digits = 0, suffix = '', cls = '' } = opts;
+  if (!series || series.length < 2) return '<div class="chart-empty">collecting…</div>';
+  const w = 320;
+  const pts = series.slice(-150);
+  const vals = pts.map(p => p.v);
+  const maxV = max != null ? max : (Math.max(...vals) || 1) * 1.15;
+  const minV = Math.min(0, ...vals);
+  const x = i => (i / (pts.length - 1)) * w;
+  const y = v => h - ((v - minV) / (maxV - minV)) * (h - 4) - 2;
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const area = `${line} L${w} ${h} L0 ${h} Z`;
+  const lastV = pts[pts.length - 1].v;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chart ${cls}">
+    <path class="fill" d="${area}"/><path class="line" d="${line}"/>
+    <text class="last" x="${w}" y="${h - 1}" text-anchor="end">${lastV.toFixed(digits)}${suffix}</text></svg>`;
+}
+function historyCharts(histKey) {
+  if (!curvesMode || !historyData || !historyData.hosts) return '';
+  const s = historyData.hosts[histKey];
+  if (!s) return '';
+  const has = k => s[k] && s[k].length >= 2;
+  let html = '<div class="mod-title">History</div>';
+  if (has('cpu')) html += `<div class="hrow">CPU</div>` + svgChart(s.cpu, { suffix: '%', cls: 'rx' });
+  if (has('mem')) html += `<div class="hrow">Memory</div>` + svgChart(s.mem, { suffix: '%' });
+  if (has('gpu')) html += `<div class="hrow">GPU</div>` + svgChart(s.gpu, { suffix: '%' });
+  if (has('netRx') || has('netTx')) {
+    html += `<div class="hrow">Network ↓ <span class="lg rx"></span> / ↑ <span class="lg tx"></span></div>`;
+    if (has('netRx')) html += svgChart(s.netRx, { suffix: ' ↓', digits: 1, cls: 'rx' });
+    if (has('netTx')) html += svgChart(s.netTx, { suffix: ' ↑', digits: 1, cls: 'tx' });
+  }
+  if (has('temp')) html += `<div class="hrow">Temperature</div>` + svgChart(s.temp, { suffix: '°C', digits: 1, cls: 'tx' });
+  if (!has('cpu') && !has('mem') && !has('gpu') && !has('netRx') && !has('temp')) return '';
+  return html;
+}
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = v => v ?? '—';
 
@@ -178,6 +239,7 @@ function hostCard(name, h, online) {
       if (s.memoryTotalGB != null) html += row('LLM memory', s.memoryTotalGB + ' GB');
     }
   }
+  html += historyCharts((h.host && h.host.hostname) || h.name);
   html += '</div></div>';
   return html;
 }

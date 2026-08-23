@@ -163,3 +163,16 @@ h1 .thin { color: var(--dim); font-weight: 400; }
 .log-line .lvl.warn { color: var(--warn); }
 .log-line .lvl.error { color: var(--bad); }
 .log-line .m { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+
+/* --- courbes historiques --- */
+.chart { width: 100%; height: 52px; display: block; margin-bottom: 8px; }
+.chart .fill { fill: var(--accent); opacity: 0.14; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.chart .last { font-size: 9px; fill: var(--dim); font-family: Consolas, Menlo, monospace; }
+.chart.rx .fill { fill: var(--ok); opacity: 0.13; } .chart.rx .line { stroke: var(--ok); }
+.chart.tx .fill { fill: var(--warn); opacity: 0.13; } .chart.tx .line { stroke: var(--warn); }
+.chart-empty { color: var(--dim); font-size: 11px; font-style: italic; padding: 10px 0; }
+.hrow { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 8px 0 3px; display: flex; align-items: center; gap: 6px; }
+.hrow .lg { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.hrow .lg.rx { background: var(--ok); }
+.hrow .lg.tx { background: var(--warn); }
