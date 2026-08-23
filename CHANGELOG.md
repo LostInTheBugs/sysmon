@@ -2,6 +2,20 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.029] — 2026-08-23
+
+### Fixed
+- macOS showed system pseudo-interfaces in the network section (awdl0,
+  llw0, utun0–4, …): these virtual interfaces carry only link-local IPv6
+  and never user traffic. New `isUsefulIface()` filter drops them by name
+  pattern (awdl/llw/utun/gif/stf/tap/tun/isatap/teredo/p2p/ap) AND any
+  interface whose only address is link-local (`fe80::`) — only real,
+  routable interfaces remain (en0, etc.)
+
+### Tests
+- `scripts/test-network-match.js`: macOS interface filter
+  (14 checks)
+
 ## [2026.08.027] — 2026-08-23
 
 ### Fixed

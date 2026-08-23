@@ -142,6 +142,18 @@ async function netstatTotals() {
   }
 }
 
+// Interfaces système/pseudo (jamais de trafic utilisateur réel) :
+// awdl0/llw0 (Apple Wireless Direct Link), utun* (VPN/tunnels), gif/stf,
+// tap/tun, isatap/teredo… + toute interface sans IP ROUTABLE (une ip6
+// link-local fe80:: seule ne sert à rien).
+const BAD_IFACE_RE = /^(awdl|llw|utun|gif|stf|tap|tun|isatap|teredo|p2p|ap)\d*/i;
+function isUsefulIface(i) {
+  if (i.internal || i.virtual) return false;
+  if (BAD_IFACE_RE.test(i.iface || '')) return false;
+  if (i.ip4) return true;
+  return !!i.ip6 && !String(i.ip6).startsWith('fe80:');
+}
+
 async function collect() {
   try {
     const [stats0, ifaces, defGw, wanData] = await Promise.all([
@@ -166,7 +178,7 @@ async function collect() {
     let anyMatched = false;
     const now = Date.now();
     const ifaceList = (ifaces || [])
-      .filter(i => !i.internal && !i.virtual && (i.ip4 || i.ip6))
+      .filter(isUsefulIface)
       .map(i => {
         const s = matchStats(stats, i.iface, i.ifaceName);
         if (s) anyMatched = true;
@@ -247,4 +259,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, matchStats, computeRates, parseAdapterStats, parseNetstatTotals, name: 'network' };
+module.exports = { collect, matchStats, computeRates, parseAdapterStats, parseNetstatTotals, isUsefulIface, name: 'network' };

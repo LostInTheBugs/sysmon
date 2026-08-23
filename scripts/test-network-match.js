@@ -72,6 +72,18 @@ nst = parseNetstatTotals('rien du tout');
 ok = ok && nst === null;
 console.log('netstat empty:', ok ? 'OK' : 'FAIL');
 
+// 9. filtre des interfaces macOS (awdl0/llw0/utun*) + IP link-local
+const { isUsefulIface } = require('../src/main/collectors/network');
+const macIfaces = [
+  { iface: 'en0', ip4: '192.168.27.2', internal: false, virtual: false },
+  { iface: 'awdl0', ip6: 'fe80::1234', internal: false, virtual: false },
+  { iface: 'llw0', ip6: 'fe80::5678', internal: false, virtual: false },
+  { iface: 'utun3', ip6: 'fe80::9abc', internal: false, virtual: false },
+  { iface: 'lo0', ip4: '127.0.0.1', internal: true, virtual: false }
+];
+ok = ok && macIfaces.filter(isUsefulIface).length === 1 && macIfaces.filter(isUsefulIface)[0].iface === 'en0';
+console.log('mac iface filter:', ok ? 'OK' : 'FAIL', '→', macIfaces.filter(isUsefulIface).map(i => i.iface).join(','));
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);
