@@ -2,6 +2,39 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.044] — 2026-08-23 — STABLE release
+
+First stable release. Everything validated on Windows, macOS and Linux
+by the test cycle 015 → 043:
+
+### Network (fixed end-to-end on all platforms)
+- Windows: perfmon counters broken (0 MB/s) → fallback
+  `Get-NetAdapterStatistics`, byte deltas, and `netstat -e` for upload
+  when `SentBytes` is frozen
+- macOS 26: `si.networkStats()` returns a single `utun` entry →
+  `netstat -ib` direct parsing
+- macOS system pseudo-interfaces (awdl0, llw0, utun*) filtered out;
+  VPN tunnels shown only while they carry traffic
+- 3-level interface matching, throttled diagnostics in the debug log
+
+### Bar mode (tray / menu bar)
+- Live values with **icons** (🖥️ CPU, 🧠 RAM, 🎮 GPU, 🌡️ temperature,
+  📶 network), multiple metrics at once, 3 display styles: numeric,
+  sparklines (history curves), or both
+- Windows: native tray text; macOS/Linux: PNG rendering (SVG data URLs
+  are not decoded by nativeImage on those OSes — invisible icons fixed)
+- Font size, icon/value spacing and vertical centering tuned
+
+### Update detection
+- Checks GitHub at startup + every 6 h (toggle in settings)
+- ⬆ badge in the widget, "Updates" card in settings with check-now
+  button, green pill on the web dashboard
+
+### Also
+- 12/12 regression tests (network matching, updater, master/slave,
+  dashboard, history, remote config…)
+- README features list kept in sync
+
 ## [2026.08.043] — 2026-08-23
 
 ### Changed
