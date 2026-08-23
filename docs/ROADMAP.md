@@ -1,11 +1,11 @@
 # SysMon Roadmap
 
-## 1. Logging system (debug / info / warn / error)
-- Local level-based logs in the existing log file (`userData/sysmon-debug.log`)
-- File rotation (max size, history)
-- **Slave logs forwarded to the master** (dedicated WebSocket channel, buffer + backfill)
-- Log view in the web dashboard (filter by host/level) and in the settings window
-- Configurable level (`logLevel`: debug|info|warn|error)
+## 1. Logging system (debug / info / warn / error) — ✅ DONE (2026.08.011)
+- Local level-based logs in the existing log file (`userData/sysmon-debug.log`) ✅
+- File rotation (max size, history) 🔲
+- **Slave logs forwarded to the master** (dedicated WebSocket channel, buffer + backfill) ✅
+- Log view in the web dashboard (filter by host/level) ✅ — log view in the settings window 🔲
+- Configurable level (`logLevel`: debug|info|warn|error) ✅
 
 ## 2. Remote slave configuration (via the master)
 - The master pushes a configuration (modules, cadence, logLevel…) to each slave
@@ -24,10 +24,11 @@
 - **Via internet**: the slave (or the master) checks GitHub releases (`api.github.com/repos/LostInTheBugs/sysmon/releases`), compares versions, downloads and installs
 - Warning + changelog shown before updating, with a postpone option
 
-## 5. Display themes
-- Preset themes: Dark (default), Light, AMOLED, Compact
-- Customizable accent color (widget, settings window, web dashboard)
-- Theme selector in the settings window, applied live, persisted in the config
+## 5. Display themes — ✅ DONE (2026.08.011) + resource history & curves (2026.08.013)
+- Preset themes: Dark (default), Light, AMOLED, Compact ✅
+- Customizable accent color (widget, settings window, web dashboard) ✅
+- Theme selector in the settings window, applied live, persisted in the config ✅
+- Bonus: in-memory resource history (10 min – 2 h) + historical curves mode (widget & dashboard) + "in the bar" tray mode ✅
 
 ## 6. Multilingual support
 - i18n of the three interfaces: widget, settings window, web dashboard

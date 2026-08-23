@@ -15,13 +15,19 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 - **LLM** — if a local LLM server is detected: loaded models, status, memory consumption, running tasks
 - **Virtualization / Docker** — current hypervisor (KVM, VMware, Hyper-V, VirtualBox, QEMU), Docker engine: per-container CPU/memory/network, local VMs: Hyper-V, VMware Workstation, VirtualBox, QEMU/KVM (state, CPU, memory, NICs)
 - **Master/slave mode** — slaves scan the network or use the master's IP; the master can enable a web access and validate slaves automatically or manually (from the app or the web interface)
+- **Web dashboard** — served by the master (`http://localhost:8597`): all hosts with live resources, slave validation, **centralized logs** (host + level filters, auto-refresh), **historical curves** per host (📈 button), themes (◐ button)
+- **Centralized logs** — leveled logger (debug/info/warn/error) on every machine; slaves stream their logs to the master; log level configurable in settings
+- **Resource history** — compact in-memory samples (CPU, frequency, RAM, GPU, network, temperature, battery) on each machine; the master keeps the slaves' history too (10 min – 2 h window)
+- **Two chart modes** — *instant* values or *historical curves* (SVG area/line charts per metric), toggled live with the 📊/📈 button in the widget title bar or in settings
+- **Themes** — Dark (default), Light, AMOLED, Compact + custom accent color, applied live to the widget, settings window and web dashboard
+- **"In the bar" mode** — the tray/menu-bar icon shows a live value (CPU %, RAM %, GPU %, network ↓/↑, temperature, battery) with full details in the tooltip; metric selectable in settings
 
 ## Platform support
 
 | Platform | Status |
 |----------|--------|
 | Windows  | ✅ Installer (NSIS) + portable exe |
-| macOS    | 🔜 Build from a Mac (dmg) |
+| macOS    | ✅ DMG (arm64, Apple Silicon) — unsigned build: right-click → Open on first launch |
 | Linux    | ✅ AppImage + deb |
 
 ## Troubleshooting
@@ -38,7 +44,7 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md): logging system (local + master), remote slave configuration, configurable master/slave communication direction (push/pull/both), slave updates (via master or GitHub), display themes, i18n.
+See [docs/ROADMAP.md](docs/ROADMAP.md). Done: logging system (local + master, dashboard log view) ✅, display themes ✅. Next: remote slave configuration, configurable master/slave communication direction (push/pull/both), slave updates, i18n.
 
 ## Installation
 
