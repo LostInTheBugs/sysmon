@@ -60,6 +60,18 @@ parsed = parseAdapterStats('{"Name":"Ethernet 2","ReceivedBytes":1,"SentBytes":2
 ok = ok && parsed.length === 1 && parsed[0].rx_bytes === 1;
 console.log('adapter stats single:', ok ? 'OK' : 'FAIL');
 
+// 8. parsing netstat -e (EN + FR)
+const { parseNetstatTotals } = require('../src/main/collectors/network');
+let nst = parseNetstatTotals('Interface Statistics\n\n                    Received    Sent\nBytes              12345678    87654321\nUnicast packets    1234        5678\n');
+ok = ok && !!nst && nst.rx_bytes === 12345678 && nst.tx_bytes === 87654321;
+console.log('netstat EN:', ok ? 'OK' : 'FAIL', '→ rx', nst && nst.rx_bytes, 'tx', nst && nst.tx_bytes);
+nst = parseNetstatTotals('Statistiques d\'interface\n\n                    Reçus       Envoyés\nOctets              111111      222222\nPaquets unicast     33          44\n');
+ok = ok && !!nst && nst.rx_bytes === 111111 && nst.tx_bytes === 222222;
+console.log('netstat FR:', ok ? 'OK' : 'FAIL', '→ rx', nst && nst.rx_bytes, 'tx', nst && nst.tx_bytes);
+nst = parseNetstatTotals('rien du tout');
+ok = ok && nst === null;
+console.log('netstat empty:', ok ? 'OK' : 'FAIL');
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);

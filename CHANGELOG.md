@@ -2,6 +2,19 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.027] — 2026-08-23
+
+### Fixed
+- Upload (TX) still 0 while download works: `Get-NetAdapterStatistics` reports
+  a working `ReceivedBytes` but a stuck `SentBytes` on some machines. A
+  persistent latch detects the broken TX counter (RX bytes moving, TX stuck
+  at 0) and switches the outgoing rate to `netstat -e` totals (always
+  reliable, locale-independent parsing), applied to the default interface
+
+### Tests
+- `scripts/test-network-match.js`: netstat -e parsing (English + French)
+  (13 checks)
+
 ## [2026.08.025] — 2026-08-23
 
 ### Fixed

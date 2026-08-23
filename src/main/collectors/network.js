@@ -10,6 +10,9 @@ let wanFetchedAt = 0;
 let lastJoinWarnAt = 0;
 let lastRawLogAt = 0;
 let prevBytes = new Map(); // clé iface -> { rx, tx, at } pour le calcul du débit
+let prevNetstat = null;    // { rx, tx, at } pour le repli netstat -e
+let lastNetstatAt = 0;
+let txBrokenWin = false;   // SentBytes cassé (latch, Windows uniquement)
 
 // --- Routes (best-effort, per-OS) -------------------------------------------
 async function routes() {
@@ -116,6 +119,29 @@ async function windowsAdapterStats() {
   }
 }
 
+// Repli ultime (Windows) : netstat -e — fonctionne toujours, indépendant de
+// perfmon. La 1re ligne à deux nombres est la ligne "Octets/Bytes" (toujours
+// la première dans netstat -e, label localisé mais position stable).
+function parseNetstatTotals(stdout) {
+  for (const line of String(stdout).split('\n')) {
+    const m = line.match(/^\s*\S+\s+(\d+)\s+(\d+)\s*$/);
+    if (m) return { rx_bytes: parseInt(m[1], 10), tx_bytes: parseInt(m[2], 10) };
+  }
+  return null;
+}
+
+async function netstatTotals() {
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execP = promisify(exec);
+    const { stdout } = await execP('netstat -e', { timeout: 5000, windowsHide: true });
+    return parseNetstatTotals(stdout);
+  } catch {
+    return null;
+  }
+}
+
 async function collect() {
   try {
     const [stats0, ifaces, defGw, wanData] = await Promise.all([
@@ -150,6 +176,8 @@ async function collect() {
           const rates = computeRates(prevBytes.get(key), s, now);
           rxMBs = rates.rxMBs; txMBs = rates.txMBs;
           prevBytes.set(key, { rx: s.rx_bytes, tx: s.tx_bytes, at: now });
+          // Latch : compteur d'envoi cassé (octets reçus qui bougent, envoyés à 0)
+          if (s.rx_bytes > 0 && s.tx_bytes === 0) txBrokenWin = true;
         }
         return {
           iface: i.iface,
@@ -165,6 +193,28 @@ async function collect() {
           isDefault: defGw && defGw.iface === i.iface
         };
       });
+    // Repli tx Windows : compteur SentBytes cassé (latch txBrokenWin) — le
+    // débit sortant vient de netstat -e (agrégé, affecté à l'interface par
+    // défaut qui porte l'essentiel du trafic). Toutes les 2 s tant que cassé.
+    if (process.platform === 'win32' && txBrokenWin && now - lastNetstatAt > 2000) {
+      lastNetstatAt = now;
+      const nt = await netstatTotals();
+      if (nt) {
+        const dt = prevNetstat ? (now - prevNetstat.at) / 1000 : 0;
+        if (prevNetstat && dt > 0.5) {
+          const dtx = (nt.tx_bytes - prevNetstat.tx) / 1048576;
+          if (dtx > 0) {
+            const target = ifaceList.find(i => i.isDefault) || ifaceList[0];
+            target.txMBs = Math.round(dtx / dt * 10) / 10;
+            try {
+              const logger = require('../logger');
+              logger.debug('network', 'netstat -e fallback for TX:', target.iface, target.txMBs, 'MB/s');
+            } catch { /* logger pas dispo (test) */ }
+          }
+        }
+        prevNetstat = { rx: nt.rx_bytes, tx: nt.tx_bytes, at: now };
+      }
+    }
     // Diagnostic (seulement si AUCUNE interface n'a pu être jointe, 1×/min) :
     // un réseau au repos (0 MB/s) n'est PAS une erreur de jointure.
     if ((stats || []).length && ifaceList.length && !anyMatched) {
@@ -197,4 +247,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, matchStats, computeRates, parseAdapterStats, name: 'network' };
+module.exports = { collect, matchStats, computeRates, parseAdapterStats, parseNetstatTotals, name: 'network' };
