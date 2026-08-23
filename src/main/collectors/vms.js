@@ -20,12 +20,14 @@ function run(cmd, timeoutMs = 3500) {
 async function dockerData() {
   const [info, containers] = await Promise.all([
     si.dockerInfo().catch(() => null),
-    si.dockerContainers().catch(() => [])
+    // dockerAll = liste + stats CPU/mem/réseau par conteneur (dockerContainers
+    // seul ne renvoie plus les stats depuis systeminformation 5.x)
+    si.dockerAll().catch(() => [])
   ]);
-  if (!info || !info.version) return { present: false };
+  if (!info || !info.serverVersion) return { present: false };
   return {
     present: true,
-    version: String(info.version),
+    version: String(info.serverVersion),
     running: info.containersRunning || 0,
     total: info.containers || 0,
     images: info.images || 0,
@@ -36,7 +38,8 @@ async function dockerData() {
         cpu: c.cpuPercent,
         mem: c.memUsage,
         rx: c.netIO ? c.netIO.rx : null,
-        tx: c.netIO ? c.netIO.tx : null
+        // systeminformation 5.x renomme tx → wx ; on accepte les deux
+        tx: c.netIO ? (c.netIO.tx != null ? c.netIO.tx : c.netIO.wx) : null
       }))
       .slice(0, 12)
   };
