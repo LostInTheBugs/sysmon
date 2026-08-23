@@ -19,6 +19,17 @@ async function init() {
   $('#mode-badge').className = config.mode;
   $('#btn-settings').addEventListener('click', () => window.sysmon.openSettings());
   $('#btn-close').addEventListener('click', () => window.close());
+  // Badge ⬆ : une mise à jour est disponible → ouvre la page GitHub
+  $('#btn-update').addEventListener('click', async () => {
+    const u = await window.sysmon.getUpdate();
+    if (u && u.url) window.sysmon.openUpdate(u.url);
+  });
+  const refreshUpdateBadge = async () => {
+    const u = await window.sysmon.getUpdate();
+    $('#btn-update').style.display = u && u.available ? 'inline-block' : 'none';
+  };
+  refreshUpdateBadge();
+  setInterval(refreshUpdateBadge, 30 * 60 * 1000);
   $('#btn-charts').addEventListener('click', async () => {
     await window.sysmon.setConfig({ chartMode: config.chartMode === 'history' ? 'instant' : 'history' });
     refreshHistory();

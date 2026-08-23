@@ -134,6 +134,12 @@ fetch('/api/status').then(r => r.json()).then(st => {
   sysmonI18n.setLang(st.language || 'auto');
   sysmonI18n.apply(document);
   applyLogsFilters();
+  // Mise à jour disponible → pilule cliquable vers la release GitHub
+  const pill = document.getElementById('btn-update');
+  if (st.update && st.update.available && st.update.url) {
+    pill.href = st.update.url;
+    pill.style.display = 'inline-block';
+  }
 }).catch(() => { sysmonI18n.apply(document); });
 
 // --- config à distance d'un slave ---------------------------------------------

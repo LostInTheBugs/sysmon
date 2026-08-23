@@ -5,6 +5,7 @@
 const DICT = {
   fr: {
     'dash.logs': 'JOURNAUX',
+    'dash.updateAvailable': 'Nouvelle version',
     'dash.curves': 'Courbes historiques',
     'dash.theme': 'Thème',
     'dash.conn.online': 'connecté',
@@ -33,6 +34,7 @@ const DICT = {
   },
   en: {
     'dash.logs': 'LOGS',
+    'dash.updateAvailable': 'New version',
     'dash.curves': 'Historical curves',
     'dash.theme': 'Theme',
     'dash.conn.online': 'connected',

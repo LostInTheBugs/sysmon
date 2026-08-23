@@ -112,6 +112,15 @@
       </div>
 
       <div class="card">
+        <h2 data-i18n="card.updates">Mises à jour</h2>
+        <div class="field"><label data-i18n="field.checkUpdates">Vérifier les mises à jour (GitHub)</label><span class="switch"><input type="checkbox" id="checkUpdates" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.currentVersion">Version actuelle</label><span id="currentVersion" class="val"></span></div>
+        <div class="field"><button id="btnCheckUpdates" class="mini" data-i18n="btn.checkUpdates">Vérifier maintenant</button></div>
+        <div id="update-result" class="hint"></div>
+        <div class="hint" data-i18n="hint.updates">Vérification au démarrage puis toutes les 6 heures. Les versions de test (impaires) sont incluses.</div>
+      </div>
+
+      <div class="card">
         <h2 data-i18n="card.system">Système</h2>
         <div class="field"><label data-i18n="field.autoStart">Lancer au démarrage de la session</label><span class="switch"><input type="checkbox" id="autoStart" /><span class="sl"></span></span></div>
         <div class="field"><label data-i18n="field.syncMode">Synchronisation maître ↔ esclave</label>

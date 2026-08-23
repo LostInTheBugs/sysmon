@@ -13,6 +13,7 @@ const history = require('./history');
 const collectors = require('./collectors');
 const masterServer = require('./master/server');
 const slaveClient = require('./slave/client');
+const updater = require('./updater');
 
 let widgetWin = null;
 let settingsWin = null;
@@ -244,6 +245,7 @@ ipcMain.handle('config:set', (_e, patch) => {
   const next = config.set(patch);
   applyMode(next);
   applyAutoStart(next);
+  updater.start(next); // toggle checkUpdates → relance/arrête le timer
   // Restaurer l'icône radar si le mode barre est désactivé
   if (!(next.barMode || {}).enabled && tray) {
     tray.setImage(nativeImage.createFromPath(APP_ICON));
@@ -280,6 +282,10 @@ ipcMain.handle('history:get', () => {
   for (const k of keys) out[k] = history.series(host, k, cfg.historyMinutes);
   return { host, series: out, windowMs: (cfg.historyMinutes || 30) * 60 * 1000 };
 });
+// --- mises à jour ------------------------------------------------------------
+ipcMain.handle('update:check', () => updater.check());
+ipcMain.handle('update:last', () => updater.getLastCheck());
+ipcMain.handle('update:open', (_e, url) => { if (url) shell.openExternal(url); });
 
 // ---------------------------------------------------------------- lifecycle --
 app.whenReady().then(() => {
@@ -298,6 +304,7 @@ app.whenReady().then(() => {
   createTray();
   applyMode(cfg);
   applyAutoStart(cfg);
+  updater.start(cfg);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWidgetWindow();

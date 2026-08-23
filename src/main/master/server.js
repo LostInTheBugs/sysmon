@@ -13,6 +13,7 @@ const { WebSocketServer } = require('ws');
 const config = require('../config');
 const logger = require('../logger');
 const history = require('../history');
+const updater = require('../updater');
 
 const WEB_DIR = path.join(__dirname, '..', '..', 'web');
 const MAX_HOST_LOGS = 300;
@@ -193,6 +194,7 @@ function start({ getSnapshot: gs, onChange }) {
       res.end(JSON.stringify({
         mode: 'master', version: require('../../../package.json').version,
         language: cfg.language || 'auto', syncMode: cfg.syncMode || 'push',
+        update: updater ? updater.getLastCheck() : null,
         slaves: listSlaves()
       }));
       return;

@@ -33,11 +33,36 @@ async function load() {
   $('#syncMode').value = config.syncMode || 'push';
   $('#language').value = config.language || 'auto';
   if (config.portable) $('#portable-hint').style.display = 'block';
+  $('#checkUpdates').checked = config.checkUpdates !== false;
+  $('#currentVersion').textContent = config.version || '—';
   // i18n : langue + étiquettes
   sysmonI18n.setLang(config.language || 'auto');
   sysmonI18n.apply(document);
   applyTheme(config);
+  renderUpdateResult(await window.sysmon.getUpdate());
 }
+
+// --- mises à jour -------------------------------------------------------------
+function renderUpdateResult(u) {
+  const box = $('#update-result');
+  if (!u) { box.textContent = ''; return; }
+  if (u.available) {
+    box.innerHTML = sysmonI18n.t('update.available').replace('{latest}', u.latest)
+      + ' <button id="btnSeeRelease" class="mini">' + sysmonI18n.t('btn.seeRelease') + '</button>';
+    const btn = $('#btnSeeRelease');
+    if (btn) btn.addEventListener('click', () => window.sysmon.openUpdate(u.url));
+  } else if (u.latest) {
+    box.textContent = sysmonI18n.t('update.upToDate');
+  } else {
+    box.textContent = sysmonI18n.t('update.unavailable');
+  }
+}
+
+$('#btnCheckUpdates').addEventListener('click', async () => {
+  const box = $('#update-result');
+  box.textContent = sysmonI18n.t('update.checking');
+  renderUpdateResult(await window.sysmon.checkUpdate());
+});
 
 // Changement de langue → application en direct (sans attendre Enregistrer)
 $('#language').addEventListener('change', () => {
@@ -151,6 +176,7 @@ $('#save').addEventListener('click', async () => {
       autoStart: $('#autoStart').checked,
       syncMode: $('#syncMode').value,
       language: $('#language').value,
+      checkUpdates: $('#checkUpdates').checked,
       modules
     });
     status.className = 'status ok';

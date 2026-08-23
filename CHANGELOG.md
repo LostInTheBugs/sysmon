@@ -2,6 +2,21 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.033] — 2026-08-23
+
+### Added
+- **Update detection** (roadmap item 2): checks the latest GitHub release at
+  startup then every 6 hours (test builds included, toggle in settings —
+  `checkUpdates`). UI everywhere:
+  - widget: ⬆ button in the title bar (shown only when a new version exists,
+    click → GitHub release page)
+  - settings: "Updates" card with current version, check-now button and the
+    result (up to date / new version + View release / offline)
+  - web dashboard: green pill in the header linking to the release
+  - `/api/status` exposes `update` for the dashboard
+- `scripts/test-updater.js`: version comparison, GitHub response parsing,
+  live API check (10 assertions)
+
 ## [2026.08.031] — 2026-08-23
 
 ### Fixed

@@ -12,5 +12,8 @@ contextBridge.exposeInMainWorld('sysmon', {
   openDashboard: () => ipcRenderer.invoke('open:dashboard'),
   openSettings: () => ipcRenderer.invoke('open:settings'),
   refresh: () => ipcRenderer.invoke('sysinfo:refresh'),
-  getHistory: () => ipcRenderer.invoke('history:get')
+  getHistory: () => ipcRenderer.invoke('history:get'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  getUpdate: () => ipcRenderer.invoke('update:last'),
+  openUpdate: url => ipcRenderer.invoke('update:open', url)
 });

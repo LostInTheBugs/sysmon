@@ -39,6 +39,13 @@ body {
   min-height: 100vh;
 }
 
+.update-pill {
+  display: inline-block; background: var(--ok); color: #0a0e14;
+  border-radius: 999px; padding: 3px 12px; font-weight: 700;
+  font-size: 12px; text-decoration: none; margin-right: 4px;
+}
+.update-pill:hover { filter: brightness(1.15); }
+
 header {
   display: flex;
   align-items: center;
