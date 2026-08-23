@@ -2,6 +2,20 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.025] — 2026-08-23
+
+### Fixed
+- Network on Windows machines with broken performance counters: the raw log
+  proved `si.networkStats()` returns `rx_bytes: 0, rx_sec: null` even during
+  a speedtest (known Windows perfmon corruption issue). New fallback reads
+  the byte counters via `Get-NetAdapterStatistics` (native PowerShell, no
+  admin) when every si counter is zero — rates are computed from those
+  byte deltas. A debug line confirms which source is used
+
+### Tests
+- `scripts/test-network-match.js`: Get-NetAdapterStatistics JSON parsing
+  (array + single-object forms)
+
 ## [2026.08.023] — 2026-08-23
 
 ### Changed

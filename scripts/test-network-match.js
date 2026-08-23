@@ -50,6 +50,16 @@ r = computeRates({ rx: 100, tx: 100, at: t0 - 2000 }, { rx_bytes: 100, tx_bytes:
 ok = ok && r.rxMBs === 5;
 console.log('rx_sec fallback:', ok ? 'OK' : 'FAIL', '→ rxMBs', r.rxMBs);
 
+// 7. parsing Get-NetAdapterStatistics (PowerShell → JSON)
+const { parseAdapterStats } = require('../src/main/collectors/network');
+let parsed = parseAdapterStats('[{"Name":"Ethernet 2","ReceivedBytes":10485760,"SentBytes":5242880},{"Name":"Wi-Fi","ReceivedBytes":0,"SentBytes":0}]');
+ok = ok && parsed.length === 2 && parsed[0].iface === 'Ethernet 2' && parsed[0].rx_bytes === 10485760;
+console.log('adapter stats parse:', ok ? 'OK' : 'FAIL', '→', parsed[0] && parsed[0].iface, parsed[0] && parsed[0].rx_bytes);
+// cas objet unique (pas de tableau)
+parsed = parseAdapterStats('{"Name":"Ethernet 2","ReceivedBytes":1,"SentBytes":2}');
+ok = ok && parsed.length === 1 && parsed[0].rx_bytes === 1;
+console.log('adapter stats single:', ok ? 'OK' : 'FAIL');
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);

@@ -95,14 +95,48 @@ function computeRates(prev, s, now) {
   return { rxMBs, txMBs };
 }
 
+function parseAdapterStats(stdout) {
+  const data = JSON.parse(String(stdout).trim());
+  const list = Array.isArray(data) ? data : [data];
+  return list.filter(a => a && a.Name).map(a => ({ iface: String(a.Name), rx_bytes: a.ReceivedBytes || 0, tx_bytes: a.SentBytes || 0 }));
+}
+
+// Repli Windows : si si.networkStats() renvoie des compteurs à 0 (perfmon
+// cassé — connu après certaines mises à jour Windows), on lit les compteurs
+// d'octets via Get-NetAdapterStatistics (PowerShell natif, sans admin).
+async function windowsAdapterStats() {
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execP = promisify(exec);
+    const { stdout } = await execP('powershell.exe -NoProfile -NonInteractive -Command "Get-NetAdapterStatistics | Select-Object Name,ReceivedBytes,SentBytes | ConvertTo-Json -Compress"', { timeout: 8000, windowsHide: true });
+    return parseAdapterStats(stdout);
+  } catch {
+    return null;
+  }
+}
+
 async function collect() {
   try {
-    const [stats, ifaces, defGw, wanData] = await Promise.all([
+    const [stats0, ifaces, defGw, wanData] = await Promise.all([
       si.networkStats().catch(() => []),
       staticIfaces ? Promise.resolve(staticIfaces) : si.networkInterfaces().then(i => { staticIfaces = i; return i; }).catch(() => []),
       si.networkGatewayDefault().catch(() => null),
       wan()
     ]);
+    // Windows : si tous les compteurs sont à 0 (perfmon cassé), repli sur
+    // Get-NetAdapterStatistics
+    let stats = stats0 || [];
+    if (process.platform === 'win32' && stats.length && stats.every(s => !s.rx_bytes)) {
+      const as = await windowsAdapterStats();
+      if (as && as.length) {
+        stats = as;
+        try {
+          const logger = require('../logger');
+          logger.debug('network', 'si.networkStats empty → Get-NetAdapterStatistics fallback:', as.length, 'adapter(s)');
+        } catch { /* logger pas dispo (test) */ }
+      }
+    }
     let anyMatched = false;
     const now = Date.now();
     const ifaceList = (ifaces || [])
@@ -163,4 +197,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, matchStats, computeRates, name: 'network' };
+module.exports = { collect, matchStats, computeRates, parseAdapterStats, name: 'network' };
