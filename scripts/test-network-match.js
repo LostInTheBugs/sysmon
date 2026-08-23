@@ -33,6 +33,11 @@ s = matchStats([], 'Ethernet', null);
 ok = ok && s === null;
 console.log('empty stats:', ok ? 'OK' : 'FAIL');
 
+// 5. cas réel de Fred (Windows) : stats "Ethernet2" vs iface "Ethernet 2"
+const s5 = matchStats([{ iface: 'Ethernet2', rx_sec: 10485760 }], 'Ethernet 2', 'Realtek PCIe GbE Family Controller #2');
+ok = ok && !!s5 && s5.rx_sec === 10485760;
+console.log('fred windows case:', ok ? 'OK' : 'FAIL', '→ rx_sec', s5 && s5.rx_sec);
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);

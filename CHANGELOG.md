@@ -2,6 +2,12 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.021] — 2026-08-23
+
+### Fixed
+- Network diagnostic warning fired on every tick at idle (0 MB/s is valid) —
+  it now only fires when no interface matched the stats (once per minute max)
+
 ## [2026.08.019] — 2026-08-23
 
 ### Fixed

@@ -7,6 +7,7 @@ const execP = promisify(exec);
 let staticIfaces = null;
 let wanInfo = null;
 let wanFetchedAt = 0;
+let lastJoinWarnAt = 0;
 
 // --- Routes (best-effort, per-OS) -------------------------------------------
 async function routes() {
@@ -83,10 +84,12 @@ async function collect() {
       si.networkGatewayDefault().catch(() => null),
       wan()
     ]);
+    let anyMatched = false;
     const ifaceList = (ifaces || [])
       .filter(i => !i.internal && !i.virtual && (i.ip4 || i.ip6))
       .map(i => {
         const s = matchStats(stats, i.iface, i.ifaceName);
+        if (s) anyMatched = true;
         return {
           iface: i.iface,
           ifaceName: i.ifaceName || null,
@@ -101,13 +104,17 @@ async function collect() {
           isDefault: defGw && defGw.iface === i.iface
         };
       });
-    // Diagnostic : si des stats existent mais qu'aucune interface ne matche,
-    // on log les vrais noms (utile si le matching échoue encore sur un système)
-    if ((stats || []).length && ifaceList.length && ifaceList.every(i => !i.rxMBs && !i.txMBs)) {
-      try {
-        const logger = require('../logger');
-        logger.warn('network', 'stats/iface join failed — stats names:', (stats || []).map(s => s.iface).join(' | '), '— iface names:', ifaceList.map(i => i.iface + (i.ifaceName ? ' (' + i.ifaceName + ')' : '')).join(' | '));
-      } catch { /* logger pas dispo (test) */ }
+    // Diagnostic (seulement si AUCUNE interface n'a pu être jointe, 1×/min) :
+    // un réseau au repos (0 MB/s) n'est PAS une erreur de jointure.
+    if ((stats || []).length && ifaceList.length && !anyMatched) {
+      const now = Date.now();
+      if (now - lastJoinWarnAt > 60000) {
+        lastJoinWarnAt = now;
+        try {
+          const logger = require('../logger');
+          logger.warn('network', 'stats/iface join failed — stats names:', (stats || []).map(s => s.iface).join(' | '), '— iface names:', ifaceList.map(i => i.iface + (i.ifaceName ? ' (' + i.ifaceName + ')' : '')).join(' | '));
+        } catch { /* logger pas dispo (test) */ }
+      }
     }
     return {
       ok: true,
