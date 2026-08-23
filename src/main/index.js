@@ -5,6 +5,7 @@
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config');
 const collectors = require('./collectors');
 const masterServer = require('./master/server');
@@ -58,6 +59,7 @@ function openSettings() {
   settingsWin = new BrowserWindow({
     width: 520, height: 640,
     title: 'SysMon — Settings',
+    autoHideMenuBar: true, // pas de menu en haut de la fenêtre paramètres
     backgroundColor: '#16181d',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),

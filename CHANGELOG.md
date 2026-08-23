@@ -2,6 +2,26 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.007] — 2026-08-23
+
+### Fixed
+- **Slave never reconnected after a failed WebSocket connection** — the biggest
+  master/slave blocker: after any connection error (firewall, master not ready yet,
+  transient network issue), `ws` was never reset to `null`, so `scheduleReconnect()`
+  bailed out immediately and the slave stayed dead forever. It now clears the socket
+  on close, re-discovers the master at every reconnect cycle, and retries every 10 s
+- The debug log (`userData/sysmon-debug.log`) was silently empty: `fs` was used but
+  never required in the main process. Fixed, and the master/slave modules now log
+  their key events (discovery received, slave hello, status changes, WS errors) —
+  useful to diagnose firewall or network issues
+- Rejected slaves no longer reconnect in a loop: the slave stops retrying once the
+  master has rejected it
+
+### Changed
+- Settings window: removed the default menu bar at the top (`autoHideMenuBar`)
+- Documentation (`docs/SPEC.md`, `docs/ROADMAP.md`) translated to English — docs
+  rule is English; only the user-facing UI stays French
+
 ## [2026.08.005] — 2026-08-23
 
 ### Fixed

@@ -3,10 +3,17 @@
 // connexion WebSocket et push des snapshots.
 
 const dgram = require('dgram');
+const fs = require('fs');
+const path = require('path');
 const { WebSocket } = require('ws');
 const config = require('../config');
 const pkg = require('../../../package.json');
 const os = require('os');
+
+const DEBUG_LOG = path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
+function dlog(...args) {
+  try { fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [slave] ${args.join(' ')}\n`); } catch { /* ignore */ }
+}
 
 let ws = null;
 let timer = null;
@@ -15,6 +22,7 @@ let getSnapshot = null;
 let discoveredMaster = null;
 let statusListeners = [];
 let discovering = false;
+let rejected = false;
 
 // Broadcasts de sous-réseau (multi-interfaces, plus fiable que 255.255.255.255 seul)
 function subnetBroadcasts() {
@@ -53,6 +61,7 @@ function broadcastDiscovery() {
       for (const target of subnetBroadcasts()) {
         sock.send(payload, 0, payload.length, cfg.discoveryPort, target);
       }
+      dlog('discovery broadcast sent, targets:', subnetBroadcasts().join(','));
       // timeout de découverte : 2.5s puis abandon
       setTimeout(() => { try { sock.close(); } catch {} resolve(null); }, 2500);
     });
@@ -60,22 +69,35 @@ function broadcastDiscovery() {
 }
 
 function notifyStatus(status, extra) {
+  dlog('status →', status, extra ? JSON.stringify(extra) : '');
   for (const l of statusListeners) l({ status, ...extra });
 }
 
+// Ré-découverte du master si l'IP n'est pas configurée en dur :
+// le master a pu démarrer après nous, changer d'adresse, ou le broadcast
+// a pu se perdre (pare-feu, réseau). À chaque cycle de reconnexion.
+async function refreshDiscovery() {
+  const cfg = config.load();
+  if (cfg.masterIp || discovering) return;
+  discovering = true;
+  try {
+    const m = await broadcastDiscovery();
+    if (m) { dlog('master discovered at', m.ip + ':' + m.port); }
+  } catch { /* ignore */ }
+  finally { discovering = false; }
+}
+
 function connect() {
+  if (rejected) return;
   const cfg = config.load();
   const target = cfg.masterIp || (discoveredMaster ? discoveredMaster.ip : null);
   if (!target) {
     notifyStatus('no-master');
-    // Le master a pu démarrer (ou le broadcast se perdre) → on re-découvre à chaque cycle
+    // Aucun master connu → on re-découvre à chaque cycle, puis on retente
     (async () => {
-      if (discovering) return;
-      discovering = true;
-      try {
-        const m = await broadcastDiscovery();
-        if (m) { discoveredMaster = m; connect(); }
-      } finally { discovering = false; }
+      await refreshDiscovery();
+      if (discoveredMaster) connect();
+      else scheduleReconnect();
     })();
     return;
   }
@@ -84,7 +106,9 @@ function connect() {
   notifyStatus('connecting', { url });
   try {
     ws = new WebSocket(url);
-  } catch {
+  } catch (e) {
+    dlog('websocket creation failed:', e.message);
+    ws = null;
     scheduleReconnect();
     return;
   }
@@ -99,7 +123,7 @@ function connect() {
     }));
     timer = setInterval(() => {
       const snap = getSnapshot ? getSnapshot() : null;
-      if (snap && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'snapshot', data: snap }));
+      if (snap && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'snapshot', data: snap }));
     }, cfg.pushIntervalMs);
   });
   ws.on('message', raw => {
@@ -107,46 +131,54 @@ function connect() {
       const msg = JSON.parse(raw);
       if (msg.type === 'welcome') {
         notifyStatus('validated', { status: msg.status, id: msg.id });
-        if (msg.status === 'rejected') {
-          // Arrêt propre : le master ne veut pas de nous
-          disconnect();
-        }
+        if (msg.status === 'rejected') { rejected = true; disconnect(); }
       } else if (msg.type === 'status') {
         // Le master a changé notre statut (validation manuelle / rejet)
         notifyStatus('validated', { status: msg.status, id: msg.id });
-        if (msg.status === 'rejected') disconnect();
+        if (msg.status === 'rejected') { rejected = true; disconnect(); }
       }
     } catch { /* ignore */ }
   });
+  ws.on('error', e => {
+    dlog('websocket error:', e && e.message ? e.message : e);
+    // 'close' suit toujours 'error' → c'est lui qui planifie la reconnexion
+  });
   ws.on('close', () => {
     if (timer) { clearInterval(timer); timer = null; }
+    ws = null;
     notifyStatus('disconnected');
     scheduleReconnect();
-  });
-  ws.on('error', () => {
-    try { ws.close(); } catch { /* ignore */ }
   });
 }
 
 function scheduleReconnect() {
+  if (rejected) return;
   if (reconnectTimer || ws) return;
-  reconnectTimer = setTimeout(() => {
+  dlog('scheduling reconnect in 10s');
+  reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    await refreshDiscovery();
     connect();
   }, 10000);
 }
 
 function disconnect() {
   if (timer) { clearInterval(timer); timer = null; }
-  if (ws) { try { ws.close(); } catch {} ws = null; }
+  if (ws) {
+    const old = ws;
+    ws = null; // évite que 'close' planifie une reconnexion pendant un arrêt volontaire
+    try { old.close(); } catch { /* ignore */ }
+  }
 }
 
 function start(snapshotFn) {
   getSnapshot = snapshotFn;
+  rejected = false;
   (async () => {
     const cfg = config.load();
     if (!cfg.masterIp) {
       discoveredMaster = await broadcastDiscovery();
+      if (discoveredMaster) dlog('master discovered at', discoveredMaster.ip + ':' + discoveredMaster.port);
     }
     connect();
   })();

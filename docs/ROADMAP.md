@@ -1,45 +1,45 @@
-# Roadmap SysMon
+# SysMon Roadmap
 
-## 1. Système de logs (debug / info / warn / error)
-- Logs locaux par niveau dans le fichier de log existant (`userData/sysmon-debug.log`)
-- Rotation du fichier (taille max, historique)
-- **Envoi des logs des slaves vers le master** (canal WebSocket dédié, tampon + rattrapage)
-- Vue des logs dans le dashboard web (filtre par hôte/niveau) et dans la fenêtre paramètres
-- Niveau configurable (`logLevel` : debug|info|warn|error)
+## 1. Logging system (debug / info / warn / error)
+- Local level-based logs in the existing log file (`userData/sysmon-debug.log`)
+- File rotation (max size, history)
+- **Slave logs forwarded to the master** (dedicated WebSocket channel, buffer + backfill)
+- Log view in the web dashboard (filter by host/level) and in the settings window
+- Configurable level (`logLevel`: debug|info|warn|error)
 
-## 2. Configuration des slaves à distance (via le master)
-- Le master pousse une configuration (modules, cadence, logLevel…) à chaque slave
-- Application à chaud sans redémarrage (collecteurs déjà modulaires)
-- UI : gestion des slaves dans les paramètres + dashboard web (éditer la config d'un slave)
-- Possibilité de forcer l'acceptation d'un slave par son IP
+## 2. Remote slave configuration (via the master)
+- The master pushes a configuration (modules, cadence, logLevel…) to each slave
+- Hot application without restart (collectors are already modular)
+- UI: slave management in the settings window + web dashboard (edit a slave's config)
+- Ability to force-accept a slave by its IP
 
-## 3. Sens de communication maître ↔ esclave configurable
-- **`push`** (actuel) : le slave envoie périodiquement ses snapshots
-- **`pull`** : le master interroge le slave à la demande (mode requête/réponse)
-- **`bidirectional`** : les deux (push + interrogation ponctuelle)
-- Réglage dans la config (`syncMode`), exposé dans les paramètres et le dashboard
+## 3. Configurable master ↔ slave communication direction
+- **`push`** (current): the slave periodically sends its snapshots
+- **`pull`**: the master queries the slave on demand (request/response mode)
+- **`bidirectional`**: both (push + on-demand queries)
+- Setting in the config (`syncMode`), exposed in the settings window and the dashboard
 
-## 4. Mise à jour des slaves
-- **Via le master** : le master pousse le binaire/paquet aux slaves (mise à jour groupée)
-- **Via internet** : le slave (ou le master) vérifie les releases GitHub (`api.github.com/repos/LostInTheBugs/sysmon/releases`), compare la version, télécharge et installe
-- Avertissement + changelog affiché avant mise à jour, option de report
+## 4. Slave updates
+- **Via the master**: the master pushes the binary/package to the slaves (grouped update)
+- **Via internet**: the slave (or the master) checks GitHub releases (`api.github.com/repos/LostInTheBugs/sysmon/releases`), compares versions, downloads and installs
+- Warning + changelog shown before updating, with a postpone option
 
-## 5. Thèmes d'affichage
-- Thèmes prédéfinis : Sombre (défaut), Clair, AMOLED, Compact
-- Accent color personnalisable (widget, paramètres, dashboard web)
-- Sélecteur de thème dans les paramètres, appliqué en direct, persisté dans la config
+## 5. Display themes
+- Preset themes: Dark (default), Light, AMOLED, Compact
+- Customizable accent color (widget, settings window, web dashboard)
+- Theme selector in the settings window, applied live, persisted in the config
 
-## 6. Multilingue
-- i18n des trois interfaces : widget, fenêtre paramètres, dashboard web
-- Langues : français + anglais d'abord, autres ensuite
-- Détection automatique de la langue système + choix manuel dans les paramètres (`language`)
+## 6. Multilingual support
+- i18n of the three interfaces: widget, settings window, web dashboard
+- Languages: French + English first, more later
+- Automatic system-language detection + manual choice in the settings window (`language`)
 
 ---
 
-### Ordre suggéré
-1. Logs (fondation : debug de toutes les fonctionnalités suivantes)
-2. Sens de communication (le mode `pull` conditionne la config à distance)
-3. Configuration des slaves à distance
-4. Mise à jour (repose sur la config à distance + le canal de logs)
-5. Thèmes (UI pure, indépendant)
-6. Multilingue (UI pure, indépendant)
+### Suggested order
+1. Logging (foundation: debugging all following features)
+2. Communication direction (the `pull` mode conditions remote configuration)
+3. Remote slave configuration
+4. Updates (relies on remote config + the log channel)
+5. Themes (pure UI, independent)
+6. Multilingual (pure UI, independent)

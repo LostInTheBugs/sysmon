@@ -14,6 +14,11 @@ const config = require('../config');
 
 const WEB_DIR = path.join(__dirname, '..', '..', 'web');
 
+const DEBUG_LOG = path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
+function dlog(...args) {
+  try { fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] [master] ${args.join(' ')}\n`); } catch { /* ignore */ }
+}
+
 let server = null;
 let wss = null;
 let udpSock = null;
@@ -140,6 +145,7 @@ function start({ getSnapshot: gs, onChange }) {
   wss = new WebSocketServer({ server, path: '/ws' });
   wss.on('connection', (ws, req) => {
     const ip = req.socket.remoteAddress;
+    dlog('websocket connection from', ip);
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     ws.on('message', raw => {
@@ -148,7 +154,8 @@ function start({ getSnapshot: gs, onChange }) {
       if (msg.type === 'hello') {
         const s = upsertSlave(msg, ip);
         ws.slaveId = s.id;
-        ws.send(JSON.stringify({ type: 'welcome', status: s.status, id: s.id, pushIntervalMs: cfg.pushIntervalMs }));
+        dlog('hello from slave', s.name, '(' + ip + ') → status', s.status);
+        ws.send(JSON.stringify({ type: 'welcome', status: s.status, id: s.id, pushIntervalMs: config.load().pushIntervalMs }));
       } else if (msg.type === 'snapshot' && ws.slaveId) {
         const s = slaves.get(ws.slaveId);
         if (s && s.status === 'approved') {
@@ -160,6 +167,7 @@ function start({ getSnapshot: gs, onChange }) {
         ws.send(JSON.stringify({ type: 'slaves', list: listSlaves() }));
       }
     });
+    ws.on('error', e => dlog('slave websocket error:', e && e.message ? e.message : e));
     ws.on('close', () => {
       dashboards.delete(ws);
       if (ws.slaveId) {
@@ -189,6 +197,7 @@ function start({ getSnapshot: gs, onChange }) {
     try {
       const req = JSON.parse(msg.toString());
       if (req.type === 'SYSMON_DISCOVER') {
+        dlog('SYSMON_DISCOVER from', rinfo.address + ':' + rinfo.port, '(' + (req.name || '?') + ')');
         const reply = JSON.stringify({ type: 'SYSMON_MASTER', name: os.hostname(), port: cfg.port });
         udpSock.send(reply, 0, reply.length, rinfo.port, rinfo.address);
       }
