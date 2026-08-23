@@ -2,6 +2,14 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.043] — 2026-08-23
+
+### Changed
+- Bar mode: space between icon and value (🖥️ 12% instead of 🖥️12%),
+  including the values under sparklines in "both" style
+- Bar text baseline moved down (~4px) for better optical vertical centering
+  in the menu bar; text-image width now adapts to the content
+
 ## [2026.08.041] — 2026-08-23
 
 ### Changed

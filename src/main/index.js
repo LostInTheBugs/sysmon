@@ -113,10 +113,11 @@ function createTray() {
 const BAR_ICONS = { cpu: '🖥️', mem: '🧠', gpu: '🎮', temp: '🌡️', net: '📶' };
 const BAR_LETTERS = { cpu: 'C', mem: 'R', gpu: 'G', temp: 'T', net: '' };
 
-function barText(metrics, sample, icons) {
-  if (!sample) return null;
+// Retourne un tableau de paires "icône valeur" (ex. ['🖥️ 12%', '🧠 45%'])
+function barParts(metrics, sample, icons) {
+  if (!sample) return [];
   const n = v => (v == null ? '—' : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10));
-  const sym = m => (icons ? BAR_ICONS[m] : BAR_LETTERS[m]);
+  const sym = m => (icons ? BAR_ICONS[m] + ' ' : BAR_LETTERS[m]);
   const parts = [];
   for (const m of metrics) {
     switch (m) {
@@ -128,6 +129,11 @@ function barText(metrics, sample, icons) {
       default: break;
     }
   }
+  return parts;
+}
+
+function barText(metrics, sample, icons) {
+  const parts = barParts(metrics, sample, icons);
   return parts.length ? parts.join(' ') : null;
 }
 
@@ -147,18 +153,20 @@ function sparkPoints(series, w, h) {
 
 const BAR_METRIC_KEYS = { cpu: 'cpu', mem: 'mem', gpu: 'gpu', temp: 'temp', net: 'netRx' };
 
-// Texte compact : 1 ligne (≤3 métriques) ou 2 lignes, petites polices, icônes
+// Texte compact : 1 ligne (≤3 métriques) ou 2 lignes, icônes + espace,
+// basé un peu plus bas pour un centrage optique dans la barre
 function barTextSvg(metrics, sample) {
-  const parts = (barText(metrics, sample, true) || '').split(' ');
-  if (!parts.length || parts[0] === '') return null;
+  const parts = barParts(metrics, sample, true);
+  if (!parts.length) return null;
   const lines = parts.length <= 3
     ? [parts.join(' ')]
     : [parts.slice(0, Math.ceil(parts.length / 2)).join(' '), parts.slice(Math.ceil(parts.length / 2)).join(' ')];
   const fontPx = lines.length > 1 ? 10 : 13;
-  const yBase = BAR_H / 2 - (lines.length - 1) * 7;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_W}" height="${BAR_H}">` +
+  const W = Math.max(BAR_W, lines.reduce((m, l) => Math.max(m, [...l].reduce((a, ch) => a + (ch.codePointAt(0) > 0x2000 ? 11 : 7.5), 0) + 12), 0));
+  const yBase = lines.length > 1 ? 13 : 20; // descendu pour le centrage vertical
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${BAR_H}">` +
     lines.map((l, i) =>
-      `<text x="${BAR_W / 2}" y="${yBase + i * 14}" font-family="Menlo,Consolas,monospace" font-size="${fontPx}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.6" text-anchor="middle">${l}</text>`
+      `<text x="${W / 2}" y="${yBase + i * 14}" font-family="Menlo,Consolas,monospace" font-size="${fontPx}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.6" text-anchor="middle">${l}</text>`
     ).join('') + '</svg>';
 }
 
@@ -181,8 +189,8 @@ function barSparkSvg(metrics, sample, host, withValues) {
     if (pts) out += `<polyline points="${pts}" fill="none" stroke="#4fc3f7" stroke-width="1.1"/>`;
     if (withValues) {
       const val = m === 'net'
-        ? '📶' + n(sample && sample.netRx) + '/' + n(sample && sample.netTx)
-        : BAR_ICONS[m] + n(sample && sample[BAR_METRIC_KEYS[m]]) + (m === 'temp' ? '°' : '%');
+        ? '📶 ' + n(sample && sample.netRx) + '/' + n(sample && sample.netTx)
+        : BAR_ICONS[m] + ' ' + n(sample && sample[BAR_METRIC_KEYS[m]]) + (m === 'temp' ? '°' : '%');
       out += `<text x="${cx + CELL_W / 2}" y="${cy + CELL_H + 5}" font-family="Menlo,Consolas,monospace" font-size="6" fill="#cfd8dc" text-anchor="middle">${val}</text>`;
     }
   });
