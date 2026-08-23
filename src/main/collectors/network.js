@@ -8,6 +8,8 @@ let staticIfaces = null;
 let wanInfo = null;
 let wanFetchedAt = 0;
 let lastJoinWarnAt = 0;
+let lastRawLogAt = 0;
+let prevBytes = new Map(); // clé iface -> { rx, tx, at } pour le calcul du débit
 
 // --- Routes (best-effort, per-OS) -------------------------------------------
 async function routes() {
@@ -76,6 +78,23 @@ function matchStats(stats, iface, ifaceName) {
     || null;
 }
 
+// Débit calculé depuis les compteurs d'octets (fiables) : si.rx_sec peut
+// rester à 0 sur certains Windows (compteurs de perf cassés) alors que
+// rx_bytes bouge. Repli sur rx_sec si les octets ne bougent pas.
+function computeRates(prev, s, now) {
+  let rxMBs = 0, txMBs = 0;
+  const dt = prev ? (now - prev.at) / 1000 : 0;
+  if (prev && dt > 0.5) {
+    const drx = s.rx_bytes != null && prev.rx != null ? (s.rx_bytes - prev.rx) / 1048576 : 0;
+    const dtx = s.tx_bytes != null && prev.tx != null ? (s.tx_bytes - prev.tx) / 1048576 : 0;
+    if (drx > 0) rxMBs = Math.round(drx / dt * 10) / 10;
+    if (dtx > 0) txMBs = Math.round(dtx / dt * 10) / 10;
+  }
+  if (rxMBs === 0 && (s.rx_sec || 0) > 0) rxMBs = Math.round(s.rx_sec / 1048576 * 10) / 10;
+  if (txMBs === 0 && (s.tx_sec || 0) > 0) txMBs = Math.round(s.tx_sec / 1048576 * 10) / 10;
+  return { rxMBs, txMBs };
+}
+
 async function collect() {
   try {
     const [stats, ifaces, defGw, wanData] = await Promise.all([
@@ -85,11 +104,19 @@ async function collect() {
       wan()
     ]);
     let anyMatched = false;
+    const now = Date.now();
     const ifaceList = (ifaces || [])
       .filter(i => !i.internal && !i.virtual && (i.ip4 || i.ip6))
       .map(i => {
         const s = matchStats(stats, i.iface, i.ifaceName);
         if (s) anyMatched = true;
+        let rxMBs = 0, txMBs = 0;
+        if (s) {
+          const key = i.iface + '|' + (i.ifaceName || '');
+          const rates = computeRates(prevBytes.get(key), s, now);
+          rxMBs = rates.rxMBs; txMBs = rates.txMBs;
+          prevBytes.set(key, { rx: s.rx_bytes, tx: s.tx_bytes, at: now });
+        }
         return {
           iface: i.iface,
           ifaceName: i.ifaceName || null,
@@ -97,8 +124,8 @@ async function collect() {
           ip4: i.ip4, ip6: i.ip6, mac: i.mac,
           speed: i.speed ? `${i.speed} Mb/s` : null,
           operstate: i.operstate,
-          rxMBs: s ? Math.round((s.rx_sec || 0) / 1048576 * 10) / 10 : 0,
-          txMBs: s ? Math.round((s.tx_sec || 0) / 1048576 * 10) / 10 : 0,
+          rxMBs,
+          txMBs,
           rxTotalGB: s ? Math.round(s.rx_bytes / 1073741824 * 100) / 100 : 0,
           txTotalGB: s ? Math.round(s.tx_bytes / 1073741824 * 100) / 100 : 0,
           isDefault: defGw && defGw.iface === i.iface
@@ -107,7 +134,6 @@ async function collect() {
     // Diagnostic (seulement si AUCUNE interface n'a pu être jointe, 1×/min) :
     // un réseau au repos (0 MB/s) n'est PAS une erreur de jointure.
     if ((stats || []).length && ifaceList.length && !anyMatched) {
-      const now = Date.now();
       if (now - lastJoinWarnAt > 60000) {
         lastJoinWarnAt = now;
         try {
@@ -115,6 +141,15 @@ async function collect() {
           logger.warn('network', 'stats/iface join failed — stats names:', (stats || []).map(s => s.iface).join(' | '), '— iface names:', ifaceList.map(i => i.iface + (i.ifaceName ? ' (' + i.ifaceName + ')' : '')).join(' | '));
         } catch { /* logger pas dispo (test) */ }
       }
+    }
+    // Log brut (debug, 1×/min) : valeurs réelles de si.networkStats() — permet
+    // de voir si les compteurs bougent pendant un speedtest.
+    if (now - lastRawLogAt > 60000) {
+      lastRawLogAt = now;
+      try {
+        const logger = require('../logger');
+        logger.debug('network', 'raw stats:', JSON.stringify((stats || []).map(s => ({ iface: s.iface, rx_sec: s.rx_sec, tx_sec: s.tx_sec, rx_bytes: s.rx_bytes, tx_bytes: s.tx_bytes }))).slice(0, 900));
+      } catch { /* logger pas dispo (test) */ }
     }
     return {
       ok: true,
@@ -128,4 +163,4 @@ async function collect() {
   }
 }
 
-module.exports = { collect, matchStats, name: 'network' };
+module.exports = { collect, matchStats, computeRates, name: 'network' };

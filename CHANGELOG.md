@@ -2,6 +2,21 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.023] — 2026-08-23
+
+### Changed
+- Network rates are now computed from the byte counters (`rx_bytes` deltas)
+  instead of relying on `si.rx_sec` — Windows systems with broken performance
+  counters report `rx_sec = 0` while the byte counters still move. `rx_sec` is
+  kept as a fallback when bytes don't move
+- New debug log (once per minute): raw `si.networkStats()` values per
+  interface — makes it possible to see exactly what the library reports
+  during a speedtest (visible in the centralized logs)
+
+### Tests
+- `scripts/test-network-match.js`: byte-delta rate + rx_sec fallback
+  (still 11/11 passing)
+
 ## [2026.08.021] — 2026-08-23
 
 ### Fixed

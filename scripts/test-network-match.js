@@ -38,6 +38,18 @@ const s5 = matchStats([{ iface: 'Ethernet2', rx_sec: 10485760 }], 'Ethernet 2', 
 ok = ok && !!s5 && s5.rx_sec === 10485760;
 console.log('fred windows case:', ok ? 'OK' : 'FAIL', '→ rx_sec', s5 && s5.rx_sec);
 
+// 6. débit calculé depuis les octets quand rx_sec = 0 (compteurs perf cassés)
+const { computeRates } = require('../src/main/collectors/network');
+const t0 = Date.now();
+// 20 Mo reçus en 2 s → 10 MB/s
+let r = computeRates({ rx: 0, tx: 0, at: t0 - 2000 }, { rx_bytes: 20971520, tx_bytes: 0, rx_sec: 0, tx_sec: 0 }, t0);
+ok = ok && r.rxMBs === 10;
+console.log('byte-delta rate:', ok ? 'OK' : 'FAIL', '→ rxMBs', r.rxMBs);
+// repli rx_sec quand les octets ne bougent pas
+r = computeRates({ rx: 100, tx: 100, at: t0 - 2000 }, { rx_bytes: 100, tx_bytes: 100, rx_sec: 5242880, tx_sec: 0 }, t0);
+ok = ok && r.rxMBs === 5;
+console.log('rx_sec fallback:', ok ? 'OK' : 'FAIL', '→ rxMBs', r.rxMBs);
+
 if (ok) {
   console.log('TEST PASSED (Windows interface name mismatch handled)');
   process.exit(0);
