@@ -124,17 +124,69 @@ function barText(metric, sample) {
   }
 }
 
-function renderBarImage(text) {
-  // 32x32 (le tray Windows le redimensionne proprement, HiDPI net)
-  const lines = String(text).split('\n');
-  const fs = lines.length > 1 ? 12 : 15;
-  const lineH = 15;
-  const y0 = 32 / 2 - ((lines.length - 1) * lineH) / 2;
-  const texts = lines.map((l, i) =>
-    `<text x="16" y="${y0 + i * lineH}" font-family="Consolas, monospace" font-size="${fs}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.6" text-anchor="middle">${l}</text>`
-  ).join('');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">${texts}</svg>`;
-  return nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+// --- mode "dans la barre" : texte rendu en PNG --------------------------------
+// Les SVG data URL ne sont PAS décodés par nativeImage (vides) sur Windows ET
+// macOS → on rasterise le SVG en PNG via un canvas dans une fenêtre cachée,
+// puis nativeImage.createFromDataURL(png) — fiable sur les 3 plateformes.
+let barCanvasWin = null;
+let barCanvasReady = null;
+let barRenderToken = 0;
+const BAR_W = 80;
+const BAR_H = 32;
+
+function ensureBarCanvas() {
+  if (barCanvasWin && !barCanvasWin.isDestroyed() && barCanvasReady) return barCanvasReady;
+  barCanvasWin = new BrowserWindow({
+    width: BAR_W, height: BAR_H, show: false, frame: false, transparent: true,
+    skipTaskbar: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false }
+  });
+  barCanvasWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
+    `<!DOCTYPE html><html><body style="margin:0"><canvas id="c" width="${BAR_W}" height="${BAR_H}"></canvas></body></html>`
+  ));
+  barCanvasReady = new Promise(r => barCanvasWin.webContents.once('did-finish-load', r));
+  barCanvasWin.on('closed', () => { barCanvasWin = null; barCanvasReady = null; });
+  return barCanvasReady;
+}
+
+function renderBarImagePng(text) {
+  ensureBarCanvas().then(() => {
+    if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
+    const lines = String(text).split('\n');
+    const fontPx = lines.length > 1 ? 13 : 22;
+    const yBase = BAR_H / 2 - (lines.length - 1) * 8;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_W}" height="${BAR_H}">` +
+      lines.map((l, i) =>
+        `<text x="${BAR_W / 2}" y="${yBase + i * 16}" font-family="Menlo,Consolas,monospace" font-size="${fontPx}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.7" text-anchor="middle">${l}</text>`
+      ).join('') + '</svg>';
+    const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+    const token = ++barRenderToken;
+    barCanvasWin.webContents.executeJavaScript(`
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.getElementById('c');
+          const x = c.getContext('2d');
+          x.clearRect(0, 0, ${BAR_W}, ${BAR_H});
+          x.drawImage(img, 0, 0);
+          resolve(c.toDataURL('image/png'));
+        };
+        img.onerror = () => resolve(null);
+        img.src = '${svgUrl}';
+      })
+    `).then(pngUrl => {
+      if (token !== barRenderToken) return; // un rendu plus récent est en cours
+      if (pngUrl && tray) {
+        const img = nativeImage.createFromDataURL(pngUrl);
+        if (!img.isEmpty()) {
+          tray.setImage(img);
+          dlog('bar png rendered', img.getSize().width + 'x' + img.getSize().height);
+        } else {
+          dlog('bar png empty for', JSON.stringify(text));
+        }
+      }
+    }).catch(e => dlog('bar png error:', String(e.message || e)));
+  });
 }
 
 function updateTrayBar(snap) {
@@ -145,12 +197,13 @@ function updateTrayBar(snap) {
   const sample = history.last(snap && snap.host ? snap.host.hostname : null) || history.last('local');
   const text = barText(bar.metric || 'cpu', sample || history.sampleFrom(snap));
   if (text == null) return;
-  // Windows : les SVG data URL sont VIDES pour nativeImage → texte natif via
-  // tray.setTitle() (affiché à côté de l'icône radar). macOS/Linux : image SVG.
+  // Windows : texte natif via tray.setTitle() (affiché à côté de l'icône).
+  // macOS/Linux : image PNG générée par canvas (les SVG data URL sont vides
+  // pour nativeImage sur Windows ET macOS).
   if (process.platform === 'win32') {
     tray.setTitle(String(text).replace('\n', ' '));
   } else {
-    tray.setImage(renderBarImage(text));
+    renderBarImagePng(text);
   }
   const h = snap && snap.host ? snap.host.hostname : 'SysMon';
   const s = sample || history.sampleFrom(snap);

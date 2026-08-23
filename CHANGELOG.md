@@ -2,6 +2,17 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.037] — 2026-08-23
+
+### Fixed
+- macOS menu-bar text not showing in the "in the bar" mode: SVG data URLs are
+  not decoded by `nativeImage` on macOS either (same root cause as the
+  Windows notification-area icon in 035) — the bar text is now rasterized
+  to a real PNG (SVG → hidden canvas → `toDataURL('image/png')`) and
+  applied via `nativeImage.createFromDataURL(png)` on macOS/Linux; Windows
+  keeps the native `tray.setTitle()`. Render result is logged
+  (`bar png rendered WxH` / `bar png empty`)
+
 ## [2026.08.035] — 2026-08-23
 
 ### Fixed
