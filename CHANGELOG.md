@@ -2,6 +2,16 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.035] — 2026-08-23
+
+### Fixed
+- Windows notification-area icon invisible when the "in the bar" mode is
+  enabled: the bar text was rendered as an SVG data URL, which
+  `nativeImage` does NOT support on Windows (empty image → invisible tray
+  icon). Windows now uses the native `tray.setTitle()` text next to the
+  radar icon (SVG image stays for macOS/Linux where it works); the title
+  is cleared when the bar mode is disabled
+
 ## [2026.08.033] — 2026-08-23
 
 ### Added

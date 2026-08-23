@@ -145,7 +145,13 @@ function updateTrayBar(snap) {
   const sample = history.last(snap && snap.host ? snap.host.hostname : null) || history.last('local');
   const text = barText(bar.metric || 'cpu', sample || history.sampleFrom(snap));
   if (text == null) return;
-  tray.setImage(renderBarImage(text));
+  // Windows : les SVG data URL sont VIDES pour nativeImage → texte natif via
+  // tray.setTitle() (affiché à côté de l'icône radar). macOS/Linux : image SVG.
+  if (process.platform === 'win32') {
+    tray.setTitle(String(text).replace('\n', ' '));
+  } else {
+    tray.setImage(renderBarImage(text));
+  }
   const h = snap && snap.host ? snap.host.hostname : 'SysMon';
   const s = sample || history.sampleFrom(snap);
   const parts = [];
@@ -249,6 +255,7 @@ ipcMain.handle('config:set', (_e, patch) => {
   // Restaurer l'icône radar si le mode barre est désactivé
   if (!(next.barMode || {}).enabled && tray) {
     tray.setImage(nativeImage.createFromPath(APP_ICON));
+    tray.setTitle(''); // Windows : efface le texte natif du mode barre
     tray.setToolTip('SysMon ' + pkg.version);
   } else {
     updateTrayBar(latestSnapshot);
