@@ -16,6 +16,18 @@ All notable changes to SysMon are documented in this file.
 - Regression test `scripts/test-restart.js` reproduces the exact scenario
   (connected slave → stop/start) and passes
 
+### Changed
+- Settings window: no more OS title bar (was white on Windows) — the window is
+  frameless like the widget, with the dark SysMon header as the drag handle and a
+  close ✕ button; no default menu bar either
+- Web dashboard: approved slaves now always appear as host cards, even before
+  their first snapshot ("Waiting for data…"), so a slave that was validated but
+  crashed/just started is still visible on the web
+- Master server: the snapshot broadcast timer is cleaned up on stop (no duplicate
+  broadcasts after saving settings in master mode)
+- Dashboard end-to-end test (`scripts/test-dashboard.js`): verifies the web feed
+  contains master AND slave resources
+
 ## [2026.08.007] — 2026-08-23
 
 ### Fixed

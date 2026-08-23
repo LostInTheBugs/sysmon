@@ -49,6 +49,7 @@ h1 .thin { color: #7f8ea3; font-weight: 400; }
 .host h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef6a6a; }
 .host h2 .dot.on { background: #5fd38a; }
 .host .sub { color: #7f8ea3; font-size: 11px; margin-bottom: 10px; }
+.host .wait { color: #7f8ea3; font-size: 12px; padding: 14px 0; font-style: italic; }
 
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
 .row { display: flex; justify-content: space-between; gap: 8px; line-height: 1.6; }

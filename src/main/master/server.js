@@ -22,6 +22,7 @@ function dlog(...args) {
 let server = null;
 let wss = null;
 let udpSock = null;
+let snapshotsTimer = null;
 let slaves = new Map();   // id -> { id, name, hostname, platform, version, ip, status, lastSeen, snapshot }
 let dashboards = new Set();
 let getSnapshot = null;
@@ -95,7 +96,11 @@ function broadcastSlaves() {
 
 function broadcastSnapshots() {
   const hosts = { master: { name: 'master', ...(getSnapshot ? getSnapshot() : {}) } };
-  for (const s of slaves.values()) if (s.status === 'approved' && s.snapshot) hosts[s.id] = { name: s.name, ...s.snapshot };
+  // Tous les slaves approuvés apparaissent — avec leurs données si déjà reçues,
+  // sinon en attente (le slave peut être approuvé avant d'avoir poussé un snapshot)
+  for (const s of slaves.values()) {
+    if (s.status === 'approved') hosts[s.id] = { name: s.name, ...(s.snapshot || {}) };
+  }
   const payload = JSON.stringify({ type: 'snapshots', hosts });
   for (const d of dashboards) if (d.readyState === 1) d.send(payload);
 }
@@ -188,7 +193,7 @@ function start({ getSnapshot: gs, onChange }) {
   server.on('close', () => clearInterval(keepAlive));
   server.listen(cfg.port, '0.0.0.0', () => {
     // Broadcast régulier des snapshots vers les dashboards
-    setInterval(broadcastSnapshots, cfg.pushIntervalMs);
+    snapshotsTimer = setInterval(broadcastSnapshots, cfg.pushIntervalMs);
   });
 
   // --- Découverte UDP : répond aux broadcasts SYSMON_DISCOVER des slaves ---
@@ -211,6 +216,7 @@ function start({ getSnapshot: gs, onChange }) {
 
 function stop() {
   if (wss) { for (const ws of wss.clients) ws.terminate(); wss.close(); wss = null; }
+  if (snapshotsTimer) { clearInterval(snapshotsTimer); snapshotsTimer = null; }
   if (server) { server.close(); server = null; }
   if (udpSock) { try { udpSock.close(); } catch {} udpSock = null; }
 }

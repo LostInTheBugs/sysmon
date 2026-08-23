@@ -11,9 +11,17 @@ body { background: var(--bg); color: var(--text); font-family: "Segoe UI", syste
 header {
   display: flex; align-items: center; gap: 10px;
   padding: 13px 16px; border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag; /* fenêtre sans bordure → l'en-tête sert à déplacer */
+  user-select: none;
 }
 header h1 { font-size: 13px; letter-spacing: 3px; color: var(--accent); font-weight: 700; }
 header .sub { color: var(--dim); font-size: 11px; flex: 1; }
+#win-close {
+  -webkit-app-region: no-drag;
+  background: transparent; border: none; color: var(--dim);
+  font-size: 13px; padding: 4px 8px; border-radius: 6px; cursor: pointer; line-height: 1;
+}
+#win-close:hover { background: rgba(239,106,106,.18); color: var(--bad); }
 .badge {
   font-size: 10px; padding: 2px 10px; border-radius: 10px;
   text-transform: uppercase; letter-spacing: 1px;

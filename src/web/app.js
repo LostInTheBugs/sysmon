@@ -26,7 +26,13 @@ function fmtBytes(b) {
 function hostCard(name, h, online) {
   const m = h.modules || {};
   let html = `<div class="host"><h2><span class="dot ${online ? 'on' : ''}"></span>${esc(name)}</h2>`;
-  html += `<div class="sub">${esc(h.host ? [h.host.platform, h.host.distro, h.host.arch, h.host.kernel].filter(Boolean).join(' · ') : '')} · ${esc(h.host ? h.host.hostname : '')}</div><div class="grid">`;
+  html += `<div class="sub">${esc(h.host ? [h.host.platform, h.host.distro, h.host.arch, h.host.kernel].filter(Boolean).join(' · ') : '')} · ${esc(h.host ? h.host.hostname : '')}</div>`;
+  if (!h.timestamp) {
+    // Slave approuvé mais pas encore de données (démarrage, redémarrage…)
+    html += '<div class="wait">Waiting for data…</div><div class="grid"></div></div>';
+    return html;
+  }
+  html += '<div class="grid">';
 
   const cpu = m.cpu;
   if (cpu && cpu.ok) {

@@ -59,6 +59,8 @@ function openSettings() {
   settingsWin = new BrowserWindow({
     width: 520, height: 640,
     title: 'SysMon — Settings',
+    frame: false,          // pas de barre de titre OS (blanche) — en-tête sombre comme le widget
+    resizable: false,
     autoHideMenuBar: true, // pas de menu en haut de la fenêtre paramètres
     backgroundColor: '#16181d',
     webPreferences: {

@@ -86,6 +86,7 @@ async function refreshSlaves() {
 document.querySelectorAll('.mode').forEach(el => {
   el.addEventListener('click', () => updateModeUI(el.dataset.mode));
 });
+$('#win-close').addEventListener('click', () => window.close());
 $('#close').addEventListener('click', () => window.close());
 $('#save').addEventListener('click', async () => {
   const status = $('#status');
