@@ -1,7 +1,7 @@
 {
   "name": "sysmon",
   "productName": "SysMon",
-  "version": "2026.8.37",
+  "version": "2026.8.39",
   "description": "SysMon — cross-platform system monitoring widget (Windows/macOS/Linux) with master/slave mode and web dashboard",
   "main": "src/main/index.js",
   "author": "LostInTheBugs",

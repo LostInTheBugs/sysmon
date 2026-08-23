@@ -20,7 +20,7 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 - **Resource history** — compact in-memory samples (CPU, frequency, RAM, GPU, network, temperature, battery) on each machine; the master keeps the slaves' history too (10 min – 2 h window)
 - **Two chart modes** — *instant* values or *historical curves* (SVG area/line charts per metric), toggled live with the 📊/📈 button in the widget title bar or in settings
 - **Themes** — Dark (default), Light, AMOLED, Compact + custom accent color, applied live to the widget, settings window and web dashboard
-- **"In the bar" mode** — the tray/menu-bar icon shows a live value (CPU %, RAM %, GPU %, network ↓/↑, temperature, battery) with full details in the tooltip; metric selectable in settings
+- **"In the bar" mode** — the tray/menu-bar icon shows live values: choose any combination of CPU, RAM, GPU, network ↓/↑ and temperature, in **numeric**, **sparkline** (mini history curves) or **both** styles; full details in the tooltip
 - **Update detection** — checks GitHub for new releases at startup then every 6 hours (test builds included); ⬆ badge in the widget, notification in settings with a "View release" button, and a pill on the web dashboard — all linking to the GitHub release page (check can be disabled in settings)
 
 ## Platform support

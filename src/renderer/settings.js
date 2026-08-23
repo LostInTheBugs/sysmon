@@ -28,7 +28,9 @@ async function load() {
   $('#historyMinutes').value = String(config.historyMinutes || 30);
   const bar = config.barMode || {};
   $('#barEnabled').checked = !!bar.enabled;
-  $('#barMetric').value = bar.metric || 'cpu';
+  const bm = Array.isArray(bar.metrics) && bar.metrics.length ? bar.metrics : ['cpu'];
+  document.querySelectorAll('input[data-barmetric]').forEach(cb => { cb.checked = bm.includes(cb.dataset.barmetric); });
+  $('#barStyle').value = bar.style || 'num';
   $('#autoStart').checked = !!config.autoStart;
   $('#syncMode').value = config.syncMode || 'push';
   $('#language').value = config.language || 'auto';
@@ -160,6 +162,8 @@ $('#save').addEventListener('click', async () => {
   try {
     const modules = {};
     document.querySelectorAll('input[data-module]').forEach(cb => { modules[cb.dataset.module] = cb.checked; });
+    const barMetrics = [];
+    document.querySelectorAll('input[data-barmetric]:checked').forEach(cb => barMetrics.push(cb.dataset.barmetric));
     config = await window.sysmon.setConfig({
       mode: (document.querySelector('.mode.active') || {}).dataset?.mode || currentMode,
       webAccess: $('#webAccess').checked,
@@ -172,7 +176,7 @@ $('#save').addEventListener('click', async () => {
       chartMode: $('#chartMode').value,
       historyEnabled: $('#historyEnabled').checked,
       historyMinutes: parseInt($('#historyMinutes').value, 10) || 30,
-      barMode: { enabled: $('#barEnabled').checked, metric: $('#barMetric').value },
+      barMode: { enabled: $('#barEnabled').checked, metrics: barMetrics.length ? barMetrics : ['cpu'], style: $('#barStyle').value },
       autoStart: $('#autoStart').checked,
       syncMode: $('#syncMode').value,
       language: $('#language').value,

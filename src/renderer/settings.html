@@ -98,17 +98,23 @@
       <div class="card">
         <h2 data-i18n="card.bar">Barre système (mode "dans la barre")</h2>
         <div class="field"><label data-i18n="field.barEnabled">Afficher une valeur en direct dans la barre</label><span class="switch"><input type="checkbox" id="barEnabled" /><span class="sl"></span></span></div>
-        <div class="field"><label data-i18n="field.barMetric">Valeur affichée</label>
-          <select id="barMetric">
-            <option value="cpu" data-i18n-key="bar.cpu">CPU %</option>
-            <option value="mem" data-i18n-key="bar.mem">RAM %</option>
-            <option value="gpu" data-i18n-key="bar.gpu">GPU %</option>
-            <option value="net" data-i18n-key="bar.net">Réseau ↓/↑</option>
-            <option value="temp" data-i18n-key="bar.temp">Température °C</option>
-            <option value="batt" data-i18n-key="bar.batt">Batterie %</option>
+        <div class="field"><label data-i18n="field.barMetrics">Valeurs affichées</label>
+          <div class="grid" id="barMetrics">
+            <div class="mod"><span>CPU</span><span class="switch"><input type="checkbox" data-barmetric="cpu" /><span class="sl"></span></span></div>
+            <div class="mod"><span>RAM</span><span class="switch"><input type="checkbox" data-barmetric="mem" /><span class="sl"></span></span></div>
+            <div class="mod"><span>GPU</span><span class="switch"><input type="checkbox" data-barmetric="gpu" /><span class="sl"></span></span></div>
+            <div class="mod"><span>Réseau ↓/↑</span><span class="switch"><input type="checkbox" data-barmetric="net" /><span class="sl"></span></span></div>
+            <div class="mod"><span>Température</span><span class="switch"><input type="checkbox" data-barmetric="temp" /><span class="sl"></span></span></div>
+          </div>
+        </div>
+        <div class="field"><label data-i18n="field.barStyle">Style d'affichage</label>
+          <select id="barStyle">
+            <option value="num" data-i18n-key="bar.num">Numérique</option>
+            <option value="graph" data-i18n-key="bar.graph">Graphique</option>
+            <option value="both" data-i18n-key="bar.both">Les deux</option>
           </select>
         </div>
-        <div class="hint" data-i18n="hint.bar">Windows : texte dans la zone de notification (icône SysMon avec la valeur). macOS : dans la barre de menu. Survolez pour le détail complet. Désactiver pour revenir à l'icône radar.</div>
+        <div class="hint" data-i18n="hint.bar">Windows : texte dans la zone de notification (icône SysMon avec les valeurs). macOS/Linux : image dans la barre (texte et/ou courbes depuis l'historique). Survolez pour le détail complet. Désactiver pour revenir à l'icône radar.</div>
       </div>
 
       <div class="card">

@@ -109,7 +109,12 @@ const DICT = {
     'update.available': '🆕 Nouvelle version {latest} disponible !',
     'update.unavailable': 'Impossible de vérifier (hors ligne ?).',
     'btn.seeRelease': 'Voir la release',
-    'hint.updates': 'Vérification au démarrage puis toutes les 6 heures. Les versions de test (impaires) sont incluses.'
+    'hint.updates': 'Vérification au démarrage puis toutes les 6 heures. Les versions de test (impaires) sont incluses.',
+    'field.barMetrics': 'Valeurs affichées',
+    'field.barStyle': 'Style d\'affichage',
+    'bar.num': 'Numérique',
+    'bar.graph': 'Graphique',
+    'bar.both': 'Les deux'
   },
   en: {
     'settings.title': 'Settings',
@@ -144,6 +149,11 @@ const DICT = {
     'update.unavailable': 'Cannot check (offline?).',
     'btn.seeRelease': 'View release',
     'hint.updates': 'Checks at startup then every 6 hours. Test builds (odd versions) are included.',
+    'field.barMetrics': 'Displayed values',
+    'field.barStyle': 'Display style',
+    'bar.num': 'Numeric',
+    'bar.graph': 'Sparklines',
+    'bar.both': 'Both',
     'field.port': 'Port',
     'field.webAccess': 'Web access (dashboard)',
     'field.autoApprove': 'Approve slaves automatically',

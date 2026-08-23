@@ -109,19 +109,80 @@ function createTray() {
 }
 
 // --- mode "dans la barre" : texte en direct dans le tray (Windows/macOS) -----
-function barText(metric, sample) {
+// Texte compact multi-métriques : "C12% R45% G78% T56° ↓1.2↑0.3"
+function barText(metrics, sample) {
   if (!sample) return null;
   const n = v => (v == null ? '—' : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10));
-  switch (metric) {
-    case 'cpu': return sample.cpu != null ? n(sample.cpu) + '%' : null;
-    case 'mem': return sample.mem != null ? n(sample.mem) + '%' : null;
-    case 'gpu': return sample.gpu != null ? n(sample.gpu) + '%' : null;
-    case 'temp': return sample.temp != null ? n(sample.temp) + '°' : null;
-    case 'batt': return sample.batt != null ? n(sample.batt) + '%' : null;
-    case 'net': return sample.netRx != null || sample.netTx != null
-      ? `↓${n(sample.netRx)}\n↑${n(sample.netTx)}` : null;
-    default: return null;
+  const parts = [];
+  for (const m of metrics) {
+    switch (m) {
+      case 'cpu': if (sample.cpu != null) parts.push('C' + n(sample.cpu) + '%'); break;
+      case 'mem': if (sample.mem != null) parts.push('R' + n(sample.mem) + '%'); break;
+      case 'gpu': if (sample.gpu != null) parts.push('G' + n(sample.gpu) + '%'); break;
+      case 'temp': if (sample.temp != null) parts.push('T' + n(sample.temp) + '°'); break;
+      case 'net': if (sample.netRx != null || sample.netTx != null) parts.push('↓' + n(sample.netRx) + '↑' + n(sample.netTx)); break;
+      default: break;
+    }
   }
+  return parts.length ? parts.join(' ') : null;
+}
+
+// Sparkline SVG depuis l'historique (dernières valeurs, normalisées)
+function sparkPoints(series, w, h) {
+  const vals = (series || []).filter(v => v != null && isFinite(v)).slice(-40);
+  if (vals.length < 2) return null;
+  let min = Infinity, max = -Infinity;
+  for (const v of vals) { if (v < min) min = v; if (v > max) max = v; }
+  const range = max - min || 1;
+  return vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * (w - 2) + 1;
+    const y = h - 2 - ((v - min) / range) * (h - 4);
+    return (Math.round(x * 10) / 10) + ',' + (Math.round(y * 10) / 10);
+  }).join(' ');
+}
+
+const BAR_METRIC_KEYS = { cpu: 'cpu', mem: 'mem', gpu: 'gpu', temp: 'temp', net: 'netRx' };
+
+// Texte compact : 1 ligne (≤3 métriques) ou 2 lignes, petites polices
+function barTextSvg(metrics, sample) {
+  const parts = (barText(metrics, sample) || '').split(' ');
+  if (!parts.length || parts[0] === '') return null;
+  const lines = parts.length <= 3
+    ? [parts.join(' ')]
+    : [parts.slice(0, Math.ceil(parts.length / 2)).join(' '), parts.slice(Math.ceil(parts.length / 2)).join(' ')];
+  const fontPx = lines.length > 1 ? 10 : 13;
+  const yBase = BAR_H / 2 - (lines.length - 1) * 7;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_W}" height="${BAR_H}">` +
+    lines.map((l, i) =>
+      `<text x="${BAR_W / 2}" y="${yBase + i * 14}" font-family="Menlo,Consolas,monospace" font-size="${fontPx}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.6" text-anchor="middle">${l}</text>`
+    ).join('') + '</svg>';
+}
+
+// Sparklines : grille 3 par ligne, hauteur totale ≤ ~30 px (barre macOS ~24 px)
+// cellules 26x7 + valeurs 6px sous chaque courbe si withValues (style "les deux")
+function barSparkSvg(metrics, sample, host, withValues) {
+  const CELL_W = 26, CELL_H = 7;
+  const perRow = metrics.length <= 2 ? metrics.length : 3;
+  const rows = Math.ceil(metrics.length / perRow);
+  const valH = withValues ? 6 : 0;
+  const W = Math.max(perRow * (CELL_W + 3) + 3, 40);
+  const H = rows * (CELL_H + 1 + valH) + 2;
+  const n = v => (v == null ? '' : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10));
+  let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect x="0" y="0" width="${W}" height="${H}" fill="#0a0e14" rx="2"/>`;
+  metrics.forEach((m, i) => {
+    const cx = 3 + (i % perRow) * (CELL_W + 3);
+    const cy = 2 + Math.floor(i / perRow) * (CELL_H + 1 + valH);
+    const pts = sparkPoints(history.series(host, BAR_METRIC_KEYS[m], 10), CELL_W, CELL_H);
+    out += `<rect x="${cx}" y="${cy}" width="${CELL_W}" height="${CELL_H}" fill="#16181d" rx="1"/>`;
+    if (pts) out += `<polyline points="${pts}" fill="none" stroke="#4fc3f7" stroke-width="1.1"/>`;
+    if (withValues) {
+      const val = m === 'net'
+        ? '↓' + n(sample && sample.netRx) + '↑' + n(sample && sample.netTx)
+        : n(sample && sample[BAR_METRIC_KEYS[m]]) + (m === 'temp' ? '°' : '%');
+      out += `<text x="${cx + CELL_W / 2}" y="${cy + CELL_H + 5}" font-family="Menlo,Consolas,monospace" font-size="6" fill="#cfd8dc" text-anchor="middle">${val}</text>`;
+    }
+  });
+  return out + '</svg>';
 }
 
 // --- mode "dans la barre" : texte rendu en PNG --------------------------------
@@ -149,16 +210,9 @@ function ensureBarCanvas() {
   return barCanvasReady;
 }
 
-function renderBarImagePng(text) {
+function renderBarImage(svg) {
   ensureBarCanvas().then(() => {
     if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
-    const lines = String(text).split('\n');
-    const fontPx = lines.length > 1 ? 13 : 22;
-    const yBase = BAR_H / 2 - (lines.length - 1) * 8;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_W}" height="${BAR_H}">` +
-      lines.map((l, i) =>
-        `<text x="${BAR_W / 2}" y="${yBase + i * 16}" font-family="Menlo,Consolas,monospace" font-size="${fontPx}" font-weight="bold" fill="#ffffff" stroke="#0a0e14" stroke-width="0.7" text-anchor="middle">${l}</text>`
-      ).join('') + '</svg>';
     const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
     const token = ++barRenderToken;
     barCanvasWin.webContents.executeJavaScript(`
@@ -166,8 +220,11 @@ function renderBarImagePng(text) {
         const img = new Image();
         img.onload = () => {
           const c = document.getElementById('c');
+          if (c.width !== img.naturalWidth || c.height !== img.naturalHeight) {
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+          }
           const x = c.getContext('2d');
-          x.clearRect(0, 0, ${BAR_W}, ${BAR_H});
+          x.clearRect(0, 0, c.width, c.height);
           x.drawImage(img, 0, 0);
           resolve(c.toDataURL('image/png'));
         };
@@ -182,7 +239,7 @@ function renderBarImagePng(text) {
           tray.setImage(img);
           dlog('bar png rendered', img.getSize().width + 'x' + img.getSize().height);
         } else {
-          dlog('bar png empty for', JSON.stringify(text));
+          dlog('bar png empty');
         }
       }
     }).catch(e => dlog('bar png error:', String(e.message || e)));
@@ -194,16 +251,21 @@ function updateTrayBar(snap) {
   const cfg = config.load();
   const bar = cfg.barMode || {};
   if (!bar.enabled) return;
-  const sample = history.last(snap && snap.host ? snap.host.hostname : null) || history.last('local');
-  const text = barText(bar.metric || 'cpu', sample || history.sampleFrom(snap));
+  const histHost = snap && snap.host && snap.host.hostname ? snap.host.hostname : 'local';
+  const sample = history.last(histHost) || history.last('local') || history.sampleFrom(snap);
+  const metrics = (Array.isArray(bar.metrics) && bar.metrics.length ? bar.metrics : ['cpu'])
+    .filter(m => ['cpu', 'mem', 'gpu', 'temp', 'net'].includes(m));
+  const style = ['num', 'graph', 'both'].includes(bar.style) ? bar.style : 'num';
+  const text = barText(metrics, sample);
   if (text == null) return;
   // Windows : texte natif via tray.setTitle() (affiché à côté de l'icône).
   // macOS/Linux : image PNG générée par canvas (les SVG data URL sont vides
   // pour nativeImage sur Windows ET macOS).
   if (process.platform === 'win32') {
-    tray.setTitle(String(text).replace('\n', ' '));
+    tray.setTitle(text.replace('\n', ' '));
   } else {
-    renderBarImagePng(text);
+    const svg = style === 'num' ? barTextSvg(metrics, sample) : barSparkSvg(metrics, sample, histHost, style === 'both');
+    if (svg) renderBarImage(svg);
   }
   const h = snap && snap.host ? snap.host.hostname : 'SysMon';
   const s = sample || history.sampleFrom(snap);

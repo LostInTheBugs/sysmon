@@ -34,6 +34,7 @@ const DEFAULTS = {
     cpu: true, memory: true, disks: true, battery: true, network: true,
     connectivity: true, sensors: true, gpu: true, llm: true, vms: true
   },
+  barMode: { enabled: false, metrics: ['cpu'], style: 'num' },
   checkUpdates: true
 };
 
@@ -72,6 +73,13 @@ function load() {
   cache.language = ['auto', 'fr', 'en'].includes(cache.language) ? cache.language : 'auto';
   cache.logLevel = ['debug', 'info', 'warn', 'error'].includes(cache.logLevel) ? cache.logLevel : 'debug';
   cache.theme = ['dark', 'light', 'amoled', 'compact'].includes(cache.theme) ? cache.theme : 'dark';
+  // barMode : migration depuis l'ancien format {metric:'cpu'} → {metrics:[...]}
+  const bar = cache.barMode || {};
+  if (typeof bar.metric === 'string' && !Array.isArray(bar.metrics)) bar.metrics = [bar.metric];
+  bar.metrics = (Array.isArray(bar.metrics) ? bar.metrics : ['cpu']).filter(m => ['cpu', 'mem', 'gpu', 'net', 'temp'].includes(m));
+  if (!bar.metrics.length) bar.metrics = ['cpu'];
+  bar.style = ['num', 'graph', 'both'].includes(bar.style) ? bar.style : 'num';
+  cache.barMode = { enabled: !!bar.enabled, metrics: bar.metrics, style: bar.style };
   return cache;
 }
 

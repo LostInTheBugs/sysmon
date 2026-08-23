@@ -2,6 +2,18 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.039] — 2026-08-23
+
+### Changed
+- "In the bar" mode upgraded (user request):
+  - **Multiple metrics** at once: CPU, RAM, GPU, network ↓/↑, temperature
+    (checkboxes in settings; old single-metric config auto-migrated)
+  - **3 display styles**: numeric only (smaller compact text), sparklines
+    (mini history curves, 3 per row), or both (curves + values)
+  - Windows keeps the native `tray.setTitle()` text; macOS/Linux rasterize
+    the SVG to a PNG canvas whose size now matches the content
+  - `barMode` config: `{ enabled, metrics: [...], style: 'num'|'graph'|'both' }`
+
 ## [2026.08.037] — 2026-08-23
 
 ### Fixed
