@@ -2,6 +2,15 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.041] — 2026-08-23
+
+### Changed
+- Bar mode now uses **icons** instead of letters: 🖥️ CPU, 🧠 RAM, 🎮 GPU,
+  🌡️ temperature, 📶 network (macOS/Linux image; Windows keeps compact
+  letters in the native tray text since emoji do not render there)
+- "Both" style: each sparkline shows its icon + value underneath (e.g.
+  🧠45%) so curves are identifiable without labels
+
 ## [2026.08.039] — 2026-08-23
 
 ### Changed

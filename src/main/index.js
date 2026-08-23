@@ -109,18 +109,22 @@ function createTray() {
 }
 
 // --- mode "dans la barre" : texte en direct dans le tray (Windows/macOS) -----
-// Texte compact multi-métriques : "C12% R45% G78% T56° ↓1.2↑0.3"
-function barText(metrics, sample) {
+// Icônes dans l'image (macOS/Linux), lettres compactes dans le texte Windows
+const BAR_ICONS = { cpu: '🖥️', mem: '🧠', gpu: '🎮', temp: '🌡️', net: '📶' };
+const BAR_LETTERS = { cpu: 'C', mem: 'R', gpu: 'G', temp: 'T', net: '' };
+
+function barText(metrics, sample, icons) {
   if (!sample) return null;
   const n = v => (v == null ? '—' : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10));
+  const sym = m => (icons ? BAR_ICONS[m] : BAR_LETTERS[m]);
   const parts = [];
   for (const m of metrics) {
     switch (m) {
-      case 'cpu': if (sample.cpu != null) parts.push('C' + n(sample.cpu) + '%'); break;
-      case 'mem': if (sample.mem != null) parts.push('R' + n(sample.mem) + '%'); break;
-      case 'gpu': if (sample.gpu != null) parts.push('G' + n(sample.gpu) + '%'); break;
-      case 'temp': if (sample.temp != null) parts.push('T' + n(sample.temp) + '°'); break;
-      case 'net': if (sample.netRx != null || sample.netTx != null) parts.push('↓' + n(sample.netRx) + '↑' + n(sample.netTx)); break;
+      case 'cpu': if (sample.cpu != null) parts.push(sym('cpu') + n(sample.cpu) + '%'); break;
+      case 'mem': if (sample.mem != null) parts.push(sym('mem') + n(sample.mem) + '%'); break;
+      case 'gpu': if (sample.gpu != null) parts.push(sym('gpu') + n(sample.gpu) + '%'); break;
+      case 'temp': if (sample.temp != null) parts.push(sym('temp') + n(sample.temp) + '°'); break;
+      case 'net': if (sample.netRx != null || sample.netTx != null) parts.push(sym('net') + '↓' + n(sample.netRx) + '↑' + n(sample.netTx)); break;
       default: break;
     }
   }
@@ -143,9 +147,9 @@ function sparkPoints(series, w, h) {
 
 const BAR_METRIC_KEYS = { cpu: 'cpu', mem: 'mem', gpu: 'gpu', temp: 'temp', net: 'netRx' };
 
-// Texte compact : 1 ligne (≤3 métriques) ou 2 lignes, petites polices
+// Texte compact : 1 ligne (≤3 métriques) ou 2 lignes, petites polices, icônes
 function barTextSvg(metrics, sample) {
-  const parts = (barText(metrics, sample) || '').split(' ');
+  const parts = (barText(metrics, sample, true) || '').split(' ');
   if (!parts.length || parts[0] === '') return null;
   const lines = parts.length <= 3
     ? [parts.join(' ')]
@@ -177,8 +181,8 @@ function barSparkSvg(metrics, sample, host, withValues) {
     if (pts) out += `<polyline points="${pts}" fill="none" stroke="#4fc3f7" stroke-width="1.1"/>`;
     if (withValues) {
       const val = m === 'net'
-        ? '↓' + n(sample && sample.netRx) + '↑' + n(sample && sample.netTx)
-        : n(sample && sample[BAR_METRIC_KEYS[m]]) + (m === 'temp' ? '°' : '%');
+        ? '📶' + n(sample && sample.netRx) + '/' + n(sample && sample.netTx)
+        : BAR_ICONS[m] + n(sample && sample[BAR_METRIC_KEYS[m]]) + (m === 'temp' ? '°' : '%');
       out += `<text x="${cx + CELL_W / 2}" y="${cy + CELL_H + 5}" font-family="Menlo,Consolas,monospace" font-size="6" fill="#cfd8dc" text-anchor="middle">${val}</text>`;
     }
   });
@@ -262,7 +266,7 @@ function updateTrayBar(snap) {
   // macOS/Linux : image PNG générée par canvas (les SVG data URL sont vides
   // pour nativeImage sur Windows ET macOS).
   if (process.platform === 'win32') {
-    tray.setTitle(text.replace('\n', ' '));
+    tray.setTitle(barText(metrics, sample, false).replace('\n', ' '));
   } else {
     const svg = style === 'num' ? barTextSvg(metrics, sample) : barSparkSvg(metrics, sample, histHost, style === 'both');
     if (svg) renderBarImage(svg);
