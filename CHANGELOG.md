@@ -2,6 +2,65 @@
 
 All notable changes to SysMon are documented in this file.
 
+## [2026.08.045] — 2026-08-25
+
+> **Breaking change (two causes)**: (1) slaves running a previous version
+> cannot connect to a 2026.08.045 master until their master token is set
+> (Settings → Slave options). (2) The master now listens on `127.0.0.1` by
+> default — for LAN use, set `bindAddress` to `0.0.0.0` in Settings → Master
+> options. The web dashboard also requires the token — open it from the tray
+> or the Settings window.
+
+### Security
+- Token authentication on the master: REST API + WebSocket + dashboard all
+  require the token (`Authorization: Bearer`, `?token=` or HttpOnly cookie);
+  the token is generated at first master start, displayed (masked) and
+  regenerable in Settings
+- Slaves authenticate with the master token in the WS URL and `hello` —
+  unauthenticated connections are refused before any message processing
+- `bindAddress` setting is now actually applied (`127.0.0.1` by default, LAN
+  exposure is an explicit `0.0.0.0` choice) — regression fixed on
+  fix/2026.08.045, covered by a LAN reachability test
+- The token is read from config on every request: after `auth:regenerate`,
+  the dashboard follows the new token (no more 401 loop)
+- The slave never logs the WS URL with its query string — the token cannot
+  leak into `sysmon-debug.log` (regression test included)
+- Mutating routes are POST-only and require header/query auth (anti-CSRF);
+  path traversal hardened (`WEB_DIR + sep` guard)
+- XSS: snapshot values are escaped in the web dashboard and widget,
+  CSP headers added
+- WebSocket: `maxPayload` 2 MB, Origin check for browser connections
+- Electron 33 → 44 (latest Chromium security fixes), `sandbox: true` on all
+  windows, navigation guard (no popups, no navigation away from local pages)
+
+### Fixed
+- Remote config pushed by the master was never applied on the slave
+  (modules/interval/log level) — now persisted and live-applied
+- `barMode` declared twice in `DEFAULTS` (dead first declaration removed,
+  migration still covered by test)
+- No single-instance lock: two instances could fight over the port, tray and
+  config cache — second instance now quits and wakes the first
+- Logger: `flushSync()` on before-quit (async flush could lose lines at
+  exit); rotation counts lines per flush batch; `reset()` restores
+  writing/dirty/timer state
+
+### Added
+- Full update client: configurable check interval (min 15 min), 0-60 s
+  startup jitter, ETag/If-None-Match (304 does not consume API quota),
+  complete release notes, version-differences window (minimal Markdown
+  renderer, no dependency), manual "Update now" (platform artifact) and
+  `autoUpdate` option with system notification
+- `DISCOVERY_PORT` environment variable (like `PORT`), documented in README
+- `npm test` (runs all `scripts/test-*.js`) + CI workflow (Node 20 & 22)
+
+### Changed
+- Version format aligned (`2026.08.045` in package.json and VERSION,
+  enforced by `scripts/check-version.js`)
+- Default log level is `info` (was `debug`); file writes are batched
+  (async queue, 500 ms)
+- Release workflow: GitHub Actions publishes releases from tags with
+  CHANGELOG notes
+
 ## [2026.08.044] — 2026-08-23 — STABLE release
 
 First stable release. Everything validated on Windows, macOS and Linux

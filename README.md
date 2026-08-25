@@ -31,6 +31,30 @@ SysMon is a cross-platform system monitoring widget for **Windows**, **macOS** a
 | macOS    | ✅ DMG (arm64, Apple Silicon) — unsigned build: right-click → Open on first launch |
 | Linux    | ✅ AppImage + deb |
 
+## Security
+
+Since 2026.08.045, the master web dashboard, REST API and WebSocket are
+**token-authenticated**:
+
+- The token is generated at first master start and shown (masked, 👁 to
+  reveal) in Settings → Master options. It can be regenerated there — all
+  connected clients are then disconnected.
+- The dashboard is served at `http://localhost:8597` and is **not accessible
+  without the token** (401). Open it from the tray menu or the Settings
+  window: the token is passed in the URL, then kept in an HttpOnly cookie
+  (it disappears from the address bar).
+- `bindAddress` controls the listening address: `127.0.0.1` (default,
+  local only — recommended) or `0.0.0.0` to expose the dashboard on the LAN.
+- UDP discovery (port `8598`, overridable with `DISCOVERY_PORT`) always
+  answers on all interfaces, but only announces the master's name and port —
+  never the token. A discovered slave still needs the token to connect, and
+  the master must be listening on `0.0.0.0` for LAN connections to succeed.
+- Slaves need the master token (Settings → Slave options, `masterToken`):
+  a slave without it is refused at connection. This is a **breaking change**
+  for slaves older than 2026.08.045.
+- The token never appears in the logs (the slave logs the WS URL without its
+  query string).
+
 ## Troubleshooting
 
 ### Master/slave: the slave does not appear on the master

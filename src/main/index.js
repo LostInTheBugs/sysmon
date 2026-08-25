@@ -433,6 +433,11 @@ function applyMode(cfg) {
         }
       });
       logger.info('main', 'master server started on port', cfg.port);
+      // Piège réseau : en local uniquement, la découverte UDP annonce le master
+      // mais les slaves distants ne peuvent pas s'y connecter (refus TCP)
+      if (cfg.bindAddress === '127.0.0.1') {
+        logger.warn('main', 'master bound to 127.0.0.1 — remote slaves will be discovered but cannot connect; set bindAddress to 0.0.0.0 in Settings for LAN use');
+      }
     } else if (cfg.mode === 'slave') {
       slaveClient.start(() => latestSnapshot);
     }
