@@ -20,10 +20,6 @@ const DEFAULTS = {
   chartMode: 'instant', // 'instant' | 'history' (courbes)
   historyEnabled: true,
   historyMinutes: 30,   // fenêtre de l'historique en mémoire
-  barMode: {
-    enabled: false,     // mode "dans la barre" (tray texte Windows / menu bar macOS)
-    metric: 'cpu'       // 'cpu' | 'mem' | 'gpu' | 'net' | 'temp' | 'batt' | 'none'
-  },
   autoStart: false,     // démarrage au login (Windows/macOS/Linux)
   syncMode: 'push',     // maître ↔ esclave : 'push' | 'pull' | 'both'
   language: 'auto',     // 'auto' | 'fr' | 'en'
@@ -37,6 +33,7 @@ const DEFAULTS = {
     cpu: true, memory: true, disks: true, battery: true, network: true,
     connectivity: true, sensors: true, gpu: true, llm: true, vms: true
   },
+  // Mode "dans la barre" : tray texte Windows / menu bar macOS
   barMode: { enabled: false, metrics: ['cpu'], style: 'num' },
   checkUpdates: true
 };
