@@ -459,7 +459,10 @@ function start({ getSnapshot: gs, onChange }) {
   }, 15000);
 
   server.on('close', () => clearInterval(keepAlive));
-  server.listen(cfg.port, '0.0.0.0', () => {
+  // bindAddress : '127.0.0.1' par défaut (DEFAULTS) — l'exposition LAN est un
+  // choix explicite ('0.0.0.0' dans les paramètres). Ne jamais écouter en dur
+  // sur 0.0.0.0 (régression T1/2026.08.045, couverte par test-auth.js)
+  server.listen(cfg.port, cfg.bindAddress, () => {
     // Broadcast régulier des snapshots vers les dashboards
     snapshotsTimer = setInterval(broadcastSnapshots, cfg.pushIntervalMs);
     // Mode pull / both : le master demande régulièrement les snapshots

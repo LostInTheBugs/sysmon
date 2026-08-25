@@ -154,6 +154,44 @@ async function run() {
   r = await fetch(`${BASE}/%2e%2e%2fpackage.json?token=${TOKEN}`);
   check('traversée encodée → 404', r.status === 404, 'got ' + r.status);
 
+  // --- P1 : bindAddress — master en 127.0.0.1 non joignable sur une IP LAN ---
+  // (le défaut DEFAULTS est 127.0.0.1 ; l'implémentation initiale écoutait en
+  // dur sur 0.0.0.0 — ce test échoue sur ce code-là)
+  function lanIP() {
+    const ifs = os.networkInterfaces();
+    for (const name of Object.keys(ifs)) {
+      for (const a of ifs[name] || []) {
+        if (a.family === 'IPv4' && !a.internal) return a.address;
+      }
+    }
+    return null;
+  }
+  const lan = lanIP();
+  if (lan) {
+    master.stop();
+    config.set({ bindAddress: '127.0.0.1' });
+    master.start({
+      getSnapshot: () => ({ timestamp: Date.now(), host: { hostname: 'auth-test', platform: 'linux' }, modules: {} }),
+      onChange: () => {}
+    });
+    await new Promise(r => setTimeout(r, 500));
+    let reachable = false;
+    try {
+      const resp = await fetch(`http://${lan}:${PORT}/api/logs?token=${TOKEN}`, { signal: AbortSignal.timeout(2000) });
+      reachable = resp.status < 500;
+    } catch { /* connexion refusée → bind 127.0.0.1 respecté */ }
+    check('bindAddress=127.0.0.1 → master NON joignable sur l\'IP LAN (' + lan + ')', !reachable, reachable ? 'joignable : ' + lan : 'refusé');
+    let loopback = false;
+    try {
+      const resp = await fetch(BASE + '/api/logs?token=' + TOKEN, { signal: AbortSignal.timeout(2000) });
+      loopback = resp.status === 200;
+    } catch { /* ignore */ }
+    check('bindAddress=127.0.0.1 → joignable en loopback', loopback);
+    master.stop();
+  } else {
+    console.log('  (aucune IP LAN — check bindAddress ignoré)');
+  }
+
   master.stop();
   console.log(failures ? `AUTH TEST FAILED (${failures} échec(s))` : 'AUTH TEST PASSED');
   process.exit(failures ? 1 : 0);
