@@ -76,6 +76,26 @@ function flush() {
   }
 }
 
+// Vidage SYNCHRONE de la file — réservé à before-quit : le process peut
+// sortir avant le rappel de l'appendFile asynchrone, et les lignes en
+// attente seraient perdues. appendFileSync garantit l'écriture sur disque.
+function flushSync() {
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  if (!pendingLines.length) { writing = false; dirty = false; return; }
+  const chunk = pendingLines.join('');
+  pendingLines = [];
+  writing = false;
+  dirty = false;
+  try {
+    if (!fileLog) fileLog = logPath();
+    fs.mkdirSync(path.dirname(fileLog), { recursive: true });
+    fs.appendFileSync(fileLog, chunk);
+    rotateIfNeeded();
+  } catch {
+    // dernier recours : on ne bloque pas la sortie de l'application
+  }
+}
+
 function scheduleFlush() {
   if (flushTimer || !pendingLines.length) return;
   flushTimer = setTimeout(flush, FLUSH_INTERVAL_MS);
@@ -120,4 +140,4 @@ function getBuffer(limit = 200, minLevel = 'debug') {
 
 function reset() { entries = []; drainedUpTo = 0; pendingLines = []; }
 
-module.exports = { log, debug, info, warn, error, drain, getBuffer, reset, flush, LEVELS };
+module.exports = { log, debug, info, warn, error, drain, getBuffer, reset, flush, flushSync, LEVELS };

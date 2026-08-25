@@ -507,7 +507,9 @@ app.on('window-all-closed', () => {
   // L'appli vit dans le tray — ne pas quitter
 });
 
-// Vider la file d'écriture du journal avant de quitter (pas de perte de logs)
+// Vider la file d'écriture du journal avant de quitter (pas de perte de logs).
+// flushSync : le flush() asynchrone n'a aucune garantie d'aboutir avant la
+// sortie du process (le rappel d'appendFile peut ne jamais s'exécuter).
 app.on('before-quit', () => {
-  logger.flush();
+  logger.flushSync();
 });
