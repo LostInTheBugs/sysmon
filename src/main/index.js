@@ -76,7 +76,8 @@ function createWidgetWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   widgetWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -101,7 +102,8 @@ function openSettings() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   settingsWin.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
@@ -227,23 +229,11 @@ function ensureBarCanvas() {
   barCanvasWin = new BrowserWindow({
     width: BAR_W, height: BAR_H, show: false, frame: false, transparent: true,
     skipTaskbar: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   barCanvasWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
-    `<!DOCTYPE html><html><body style="margin:0"><canvas id="c" width="${BAR_W}" height="${BAR_H}"></canvas></body></html>`
-  ));
-  barCanvasReady = new Promise(r => barCanvasWin.webContents.once('did-finish-load', r));
-  barCanvasWin.on('closed', () => { barCanvasWin = null; barCanvasReady = null; });
-  return barCanvasReady;
-}
-
-function renderBarImage(svg) {
-  ensureBarCanvas().then(() => {
-    if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
-    const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-    const token = ++barRenderToken;
-    barCanvasWin.webContents.executeJavaScript(`
-      new Promise((resolve) => {
+    `<!DOCTYPE html><html><body style="margin:0"><canvas id="c" width="${BAR_W}" height="${BAR_H}"></canvas><script>
+      window.renderBar = (svgUrl) => new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
           const c = document.getElementById('c');
@@ -256,9 +246,23 @@ function renderBarImage(svg) {
           resolve(c.toDataURL('image/png'));
         };
         img.onerror = () => resolve(null);
-        img.src = '${svgUrl}';
-      })
-    `).then(pngUrl => {
+        img.src = svgUrl;
+      });
+    <\/script></body></html>`
+  ));
+  barCanvasReady = new Promise(r => barCanvasWin.webContents.once('did-finish-load', r));
+  barCanvasWin.on('closed', () => { barCanvasWin = null; barCanvasReady = null; });
+  return barCanvasReady;
+}
+
+function renderBarImage(svg) {
+  ensureBarCanvas().then(() => {
+    if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
+    const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+    const token = ++barRenderToken;
+    // renderBar() est définie dans la page ; la donnée (base64) passe par
+    // JSON.stringify — jamais de concaténation de code
+    barCanvasWin.webContents.executeJavaScript('renderBar(' + JSON.stringify(svgUrl) + ')').then(pngUrl => {
       if (token !== barRenderToken) return; // un rendu plus récent est en cours
       if (pngUrl && tray) {
         const img = nativeImage.createFromDataURL(pngUrl);
@@ -400,7 +404,8 @@ function openDiffWindow(releases) {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   diffWin.loadFile(path.join(__dirname, '..', 'renderer', 'differences.html'));
@@ -523,6 +528,14 @@ ipcMain.handle('update:diff', () => {
 // ---------------------------------------------------------------- lifecycle --
 app.whenReady().then(() => {
   console.log('[sysmon] whenReady, config mode =', config.load().mode);
+  // Garde-fou de navigation (T14) : aucune fenêtre ne doit ouvrir de popup ni
+  // naviguer hors de ses pages locales. Les liens externes passent par
+  // shell.openExternal (hors navigation). La barCanvas charge une data: URL —
+  // will-navigate ne se déclenche pas au premier loadURL, vérifié.
+  app.on('web-contents-created', (_e, contents) => {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    contents.on('will-navigate', e => e.preventDefault());
+  });
   const cfg = config.load();
   collectors.start(snap => {
     latestSnapshot = snap;
