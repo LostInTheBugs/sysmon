@@ -217,11 +217,14 @@ document.getElementById('cfg-reset').addEventListener('click', resetCfg);
 cfgModal.addEventListener('click', e => { if (e.target === cfgModal) closeCfgModal(); });
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmt = v => v ?? '—';
+// Toutes les valeurs affichées sont échappées : elles proviennent des
+// snapshots des slaves (modèles GPU, montages, conteneurs Docker, WAN…)
+const fmt = v => esc(v ?? '—');
 
 function row(k, v, cls = '') { return `<div class="row"><span class="k">${esc(k)}</span><span class="v ${cls}">${fmt(v)}</span></div>`; }
 function bar(pct) {
-  const p = Math.max(0, Math.min(100, pct || 0));
+  // Borné numériquement — jamais de contenu injecté dans l'attribut style
+  const p = Number.isFinite(+pct) ? Math.max(0, Math.min(100, +pct)) : 0;
   return `<div class="bar"><div class="${p > 85 ? 'bad' : p > 65 ? 'warn' : ''}" style="width:${p}%"></div></div>`;
 }
 function modTitle(t) { return `<div class="mod-title">${esc(t)}</div>`; }
