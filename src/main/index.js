@@ -363,14 +363,23 @@ function applyMode(cfg) {
   rebuildTrayMenu();
 }
 
-// Config poussée par le maître au slave (modules, cadence, logLevel)
+// Config poussée par le maître au slave (modules, cadence, logLevel, syncMode).
+// Le patch reçu est APPLIQUÉ puis persisté — avant 2026.08.045, il était
+// testé puis ignoré au profit de la config locale (modules jamais désactivés).
 slaveClient.onConfig(clean => {
-  const cfg = config.load();
-  if (clean.modules) collectors.setEnabled(cfg.modules);
+  const patch = {};
+  if (clean.modules) patch.modules = clean.modules;
+  if (clean.pushIntervalMs) patch.pushIntervalMs = clean.pushIntervalMs;
+  if (clean.logLevel) patch.logLevel = clean.logLevel;
+  if (clean.syncMode) patch.syncMode = clean.syncMode;
+  const next = Object.keys(patch).length ? config.set(patch) : config.load();
+  // Appliquer réellement les modules (la boucle de collecte n'émet plus les
+  // modules désactivés → ils disparaissent des snapshots poussés au master)
+  collectors.setEnabled(next.modules);
   logger.info('slave', 'remote config from master:', JSON.stringify(clean));
   // Refléter dans les fenêtres ouvertes (thème inchangé, mais modules…)
   for (const w of [widgetWin, settingsWin]) {
-    if (w && !w.isDestroyed()) w.webContents.send('config', cfg);
+    if (w && !w.isDestroyed()) w.webContents.send('config', next);
   }
 });
 
