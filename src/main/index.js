@@ -39,6 +39,20 @@ if (PORTABLE_MODE) {
 // Identité Windows : icône correcte dans la barre des tâches (pas de carré vide)
 app.setAppUserModelId('com.lostinthebugs.sysmon');
 
+// --- verrou d'instance unique ------------------------------------------------
+// Une seule instance de SysMon en même temps : deux instances se disputeraient
+// le port 8597, l'icône du tray et config.json (cache mémoire divergent du
+// disque). La seconde instance quitte et réveille la première (widget).
+// Les modes debug (--screenshot=) doivent pouvoir s'exécuter même si l'appli
+// tourne déjà → seconde instance autorisée dans ce cas.
+if (!process.argv.some(a => a.startsWith('--screenshot=')) && !app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (widgetWin && !widgetWin.isDestroyed()) { widgetWin.show(); widgetWin.focus(); }
+  });
+}
+
 // --- logger (buffer + fichier) ----------------------------------------------
 
 function dlog(...args) {
