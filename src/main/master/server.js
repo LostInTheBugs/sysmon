@@ -298,6 +298,13 @@ function start({ getSnapshot: gs, onChange }) {
     if (url.pathname.startsWith('/api/slaves/')) {
       const parts = url.pathname.split('/'); // /api/slaves/:id/:action
       if (parts.length === 5 && ['approve', 'reject', 'remove'].includes(parts[4])) {
+        // Routes mutantes : POST uniquement (une requête GET est déclenchable
+        // par CSRF — une simple balise <img> sur un site tiers)
+        if (req.method !== 'POST') {
+          res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST' });
+          res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
+          return;
+        }
         const ok = parts[4] === 'remove' ? (slaves.delete(parts[3]), saveSlaves(), broadcastSlaves(), true) : setSlaveStatus(parts[3], parts[4] === 'approve' ? 'approved' : 'rejected');
         res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok }));
@@ -370,9 +377,10 @@ function start({ getSnapshot: gs, onChange }) {
       return;
     }
     let file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    file = path.normalize(file).replace(/^(\.\.([/\\]|$))+/, '');
-    const full = path.join(WEB_DIR, file);
-    if (!full.startsWith(WEB_DIR) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+    // Traversée de chemin : le fichier servi doit rester SOUS WEB_DIR (un
+    // dossier frère nommé « web-autre » ne doit pas passer le test)
+    const full = path.resolve(WEB_DIR, file);
+    if ((full !== WEB_DIR && !full.startsWith(WEB_DIR + path.sep)) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
       res.writeHead(404); res.end('Not found'); return;
     }
     const ext = path.extname(full);

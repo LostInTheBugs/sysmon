@@ -133,6 +133,27 @@ async function run() {
   check('slave avec jeton → statut final reçu (approved)', slaveResult.includes('approved'), slaveResult);
   slave.stop();
 
+  // --- T4 : routes mutantes en POST, anti-CSRF, traversée de chemin ---
+  const slaveId = (master.listSlaves()[0] || {}).id || 'fake-id';
+
+  // 12. GET sur une route mutante → 405
+  r = await fetch(`${BASE}/api/slaves/${slaveId}/approve?token=${TOKEN}`);
+  check('GET /api/slaves/:id/approve → 405', r.status === 405, 'got ' + r.status);
+
+  // 13. POST avec SEUL le cookie (pas d'en-tête/query) → 401 (anti-CSRF)
+  r = await fetch(`${BASE}/api/slaves/${slaveId}/approve`, { method: 'POST', headers: { Cookie: 'sysmon_token=' + TOKEN } });
+  check('POST approve avec cookie seul → 401 (anti-CSRF)', r.status === 401, 'got ' + r.status);
+
+  // 14. POST avec ?token= → autorisé (404 car id inconnu, PAS 401)
+  r = await fetch(`${BASE}/api/slaves/fake-id/approve?token=${TOKEN}`, { method: 'POST' });
+  check('POST approve avec ?token= → autorisé (404 id inconnu, pas 401)', r.status === 404, 'got ' + r.status);
+
+  // 15. Traversée de chemin → 404 (jamais un fichier hors de WEB_DIR)
+  r = await fetch(`${BASE}/..%2fpackage.json?token=${TOKEN}`);
+  check('traversée de chemin → 404', r.status === 404, 'got ' + r.status);
+  r = await fetch(`${BASE}/%2e%2e%2fpackage.json?token=${TOKEN}`);
+  check('traversée encodée → 404', r.status === 404, 'got ' + r.status);
+
   master.stop();
   console.log(failures ? `AUTH TEST FAILED (${failures} échec(s))` : 'AUTH TEST PASSED');
   process.exit(failures ? 1 : 0);
