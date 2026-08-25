@@ -30,9 +30,12 @@ function logPath() {
   return path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
 }
 
-// Rotation : sysmon-debug.log → .1, .1 → .2 (2 archives conservées)
-function rotateIfNeeded() {
-  writesSinceCheck++;
+// Rotation : sysmon-debug.log → .1, .1 → .2 (2 archives conservées).
+// Le compteur compte les LIGNES journalisées (un vidage peut en contenir
+// plusieurs depuis l'écriture par file — le seuil 50 = 50 lignes, pas 50
+// vidages) ; il évite un statSync à chaque entrée.
+function rotateIfNeeded(lines = 1) {
+  writesSinceCheck += lines;
   if (writesSinceCheck < 50) return;
   writesSinceCheck = 0;
   try {
@@ -65,7 +68,7 @@ function flush() {
     fs.mkdirSync(path.dirname(fileLog), { recursive: true });
     fs.appendFile(fileLog, chunk, () => {
       writing = false;
-      rotateIfNeeded();
+      rotateIfNeeded(chunk.split('\n').length - 1);
       if (dirty) { dirty = false; flush(); }
     });
   } catch {
@@ -90,7 +93,7 @@ function flushSync() {
     if (!fileLog) fileLog = logPath();
     fs.mkdirSync(path.dirname(fileLog), { recursive: true });
     fs.appendFileSync(fileLog, chunk);
-    rotateIfNeeded();
+    rotateIfNeeded(chunk.split('\n').length - 1);
   } catch {
     // dernier recours : on ne bloque pas la sortie de l'application
   }
@@ -138,6 +141,18 @@ function getBuffer(limit = 200, minLevel = 'debug') {
   return all.slice(-limit);
 }
 
-function reset() { entries = []; drainedUpTo = 0; pendingLines = []; }
+// Réinitialise l'état complet du logger (tests, changement de fichier) :
+// buffer, compteurs ET état de l'écriture (timer, drapeaux) — un reset()
+// laissant writing/dirty/flushTimer en place pouvait figer la file.
+function reset() {
+  entries = [];
+  nextId = 1;
+  drainedUpTo = 0;
+  pendingLines = [];
+  writesSinceCheck = 0;
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  writing = false;
+  dirty = false;
+}
 
 module.exports = { log, debug, info, warn, error, drain, getBuffer, reset, flush, flushSync, LEVELS };
