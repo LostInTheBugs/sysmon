@@ -131,7 +131,10 @@ function connect() {
   // Le jeton du master est exigé depuis 2026.08.045 (T2) : passé en query
   // string (validé côté master avant tout traitement de message)
   const url = `ws://${target}:${port}/ws${cfg.masterToken ? '?token=' + encodeURIComponent(cfg.masterToken) : ''}`;
-  notifyStatus('connecting', { url });
+  // L'URL ne doit JAMAIS être journalisée avec sa query string : le jeton du
+  // master finirait dans sysmon-debug.log (exploitable dès que logLevel=debug)
+  const urlForLog = url.split('?')[0];
+  notifyStatus('connecting', { url: urlForLog });
   let sock;
   try {
     sock = new WebSocket(url);
@@ -148,7 +151,7 @@ function connect() {
   // l'état de la nouvelle (crash ws.send sur null, timer tué, reconnexion).
   sock.on('open', () => {
     if (ws !== sock) { try { sock.close(); } catch { /* ignore */ } return; }
-    notifyStatus('connected', { url });
+    notifyStatus('connected', { url: urlForLog });
     sock.send(JSON.stringify({
       type: 'hello',
       name: os.hostname(),

@@ -154,6 +154,15 @@ async function run() {
   r = await fetch(`${BASE}/%2e%2e%2fpackage.json?token=${TOKEN}`);
   check('traversée encodée → 404', r.status === 404, 'got ' + r.status);
 
+  // --- P2 : le jeton ne doit JAMAIS apparaître dans les logs ---
+  // (notifyStatus journalisait l'URL complète avec ?token= — fuite
+  // exploitable dès que logLevel=debug)
+  await new Promise(r => setTimeout(r, 800)); // laisser la file d'écriture se vider
+  const logFile = path.join(path.dirname(config.configPath()), 'sysmon-debug.log');
+  let logText = '';
+  try { logText = fs.readFileSync(logFile, 'utf8'); } catch { /* pas encore de fichier */ }
+  check('jeton absent de sysmon-debug.log', !logText.includes(TOKEN), logText.slice(-400));
+
   // --- P1 : bindAddress — master en 127.0.0.1 non joignable sur une IP LAN ---
   // (le défaut DEFAULTS est 127.0.0.1 ; l'implémentation initiale écoutait en
   // dur sur 0.0.0.0 — ce test échoue sur ce code-là)
