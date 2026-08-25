@@ -67,7 +67,8 @@ Dev notes: `npm run start:no-sandbox` for headless/CI environments (Linux).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT`   | `8597`  | Master web access port |
+| `PORT`   | `8597`  | Master web access port (HTTP + WebSocket) |
+| `DISCOVERY_PORT` | `8598` | UDP discovery port (slaves find the master) |
 
 All settings are also editable in the app (Settings window) and persisted in the platform user-data folder.
 

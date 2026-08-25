@@ -6,7 +6,7 @@ const { app } = require('electron');
 const DEFAULTS = {
   mode: 'standalone', // 'standalone' | 'master' | 'slave'
   port: Number(process.env.PORT) || 8597,
-  discoveryPort: 8598,
+  discoveryPort: Number(process.env.DISCOVERY_PORT) || 8598,
   masterIp: '',
   masterToken: '',        // jeton d'accès au master (mode esclave — T2)
   authToken: '',          // généré au premier démarrage du master
