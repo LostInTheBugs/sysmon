@@ -137,10 +137,15 @@
       <div class="card">
         <h2 data-i18n="card.updates">Mises à jour</h2>
         <div class="field"><label data-i18n="field.checkUpdates">Vérifier les mises à jour (GitHub)</label><span class="switch"><input type="checkbox" id="checkUpdates" /><span class="sl"></span></span></div>
+        <div class="field"><label data-i18n="field.autoUpdate">Télécharger automatiquement les nouvelles versions</label><span class="switch"><input type="checkbox" id="autoUpdate" /><span class="sl"></span></span></div>
         <div class="field"><label data-i18n="field.currentVersion">Version actuelle</label><span id="currentVersion" class="val"></span></div>
-        <div class="field"><button id="btnCheckUpdates" class="mini" data-i18n="btn.checkUpdates">Vérifier maintenant</button></div>
+        <div class="field" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnCheckUpdates" class="mini" data-i18n="btn.checkUpdates">Vérifier maintenant</button>
+          <button id="btnUpdateNow" class="mini" style="display:none" data-i18n="btn.updateNow">Mettre à jour maintenant</button>
+          <button id="btnShowDiff" class="mini" style="display:none" data-i18n="btn.showDetails">Détails des versions</button>
+        </div>
         <div id="update-result" class="hint"></div>
-        <div class="hint" data-i18n="hint.updates">Vérification au démarrage puis toutes les 6 heures. Les versions de test (impaires) sont incluses.</div>
+        <div class="hint" data-i18n="hint.updates">Vérification au démarrage (délai aléatoire 0-60 s) puis toutes les heures (réglable). Les versions de test (impaires) sont incluses. Une nouvelle version peut être téléchargée sans remplacer l'application.</div>
       </div>
 
       <div class="card">

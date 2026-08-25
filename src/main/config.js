@@ -35,7 +35,9 @@ const DEFAULTS = {
   },
   // Mode "dans la barre" : tray texte Windows / menu bar macOS
   barMode: { enabled: false, metrics: ['cpu'], style: 'num' },
-  checkUpdates: true
+  checkUpdates: true,
+  updateIntervalSec: 3600,  // cadence de vérification des mises à jour (min 900)
+  autoUpdate: false         // téléchargement automatique d'une nouvelle version
 };
 
 let cache = null;

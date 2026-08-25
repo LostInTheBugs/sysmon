@@ -16,5 +16,8 @@ contextBridge.exposeInMainWorld('sysmon', {
   getHistory: () => ipcRenderer.invoke('history:get'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   getUpdate: () => ipcRenderer.invoke('update:last'),
-  openUpdate: url => ipcRenderer.invoke('update:open', url)
+  openUpdate: url => ipcRenderer.invoke('update:open', url),
+  downloadUpdate: release => ipcRenderer.invoke('update:download', release),
+  showDiff: () => ipcRenderer.invoke('update:diff'),
+  onDiffData: cb => ipcRenderer.on('update:diff-data', (_e, releases) => cb(releases))
 });

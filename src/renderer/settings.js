@@ -39,6 +39,7 @@ async function load() {
   $('#language').value = config.language || 'auto';
   if (config.portable) $('#portable-hint').style.display = 'block';
   $('#checkUpdates').checked = config.checkUpdates !== false;
+  $('#autoUpdate').checked = !!config.autoUpdate;
   $('#currentVersion').textContent = config.version || '—';
   // i18n : langue + étiquettes
   sysmonI18n.setLang(config.language || 'auto');
@@ -50,18 +51,29 @@ async function load() {
 // --- mises à jour -------------------------------------------------------------
 function renderUpdateResult(u) {
   const box = $('#update-result');
+  $('#btnUpdateNow').style.display = 'none';
+  $('#btnShowDiff').style.display = 'none';
   if (!u) { box.textContent = ''; return; }
   if (u.available) {
     box.innerHTML = sysmonI18n.t('update.available').replace('{latest}', u.latest)
       + ' <button id="btnSeeRelease" class="mini">' + sysmonI18n.t('btn.seeRelease') + '</button>';
     const btn = $('#btnSeeRelease');
     if (btn) btn.addEventListener('click', () => window.sysmon.openUpdate(u.url));
+    // Mettre à jour maintenant : télécharge l'artefact adapté à la plateforme
+    $('#btnUpdateNow').style.display = '';
+    $('#btnShowDiff').style.display = u.releases && u.releases.length ? '' : 'none';
   } else if (u.latest) {
     box.textContent = sysmonI18n.t('update.upToDate');
+    $('#btnShowDiff').style.display = u.releases && u.releases.length ? '' : 'none';
   } else {
     box.textContent = sysmonI18n.t('update.unavailable');
   }
 }
+$('#btnUpdateNow').addEventListener('click', async () => {
+  const u = await window.sysmon.getUpdate();
+  if (u && u.releases && u.releases.length) window.sysmon.downloadUpdate(u.releases[0]);
+});
+$('#btnShowDiff').addEventListener('click', () => window.sysmon.showDiff());
 
 $('#btnCheckUpdates').addEventListener('click', async () => {
   const box = $('#update-result');
@@ -204,6 +216,7 @@ $('#save').addEventListener('click', async () => {
       syncMode: $('#syncMode').value,
       language: $('#language').value,
       checkUpdates: $('#checkUpdates').checked,
+      autoUpdate: $('#autoUpdate').checked,
       modules
     });
     status.className = 'status ok';

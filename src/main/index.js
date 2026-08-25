@@ -3,7 +3,7 @@
 // Fenêtre widget (frameless, transparent, always-on-top), tray,
 // collecteurs système, mode master/slave, IPC.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -351,6 +351,67 @@ function applyAutoStart(cfg) {
   }
 }
 
+// --- mises à jour : téléchargement, autoUpdate, fenêtre de différences -------
+// Artefact adapté à la plateforme (.exe / .dmg / .AppImage) parmi les assets
+// de la release GitHub ; null si aucun asset ne correspond.
+function assetForPlatform(release) {
+  const pat = process.platform === 'win32' ? /\.exe$/i
+    : process.platform === 'darwin' ? /\.dmg$/i
+    : /\.AppImage$/i;
+  return (release.assets || []).find(a => pat.test(a.name)) || null;
+}
+
+// Pas de remplacement de binaire en place (hors périmètre, risqué) : on lance
+// le téléchargement de l'artefact adapté dans le navigateur (dossier de
+// téléchargements) puis on ouvre ce dossier.
+function downloadUpdate(release) {
+  const asset = assetForPlatform(release);
+  if (asset && asset.url) shell.openExternal(asset.url);
+  else shell.openExternal(release.html_url || release.url);
+  try { shell.openPath(app.getPath('downloads')); } catch { /* ignore */ }
+}
+
+// autoUpdate : une nouvelle version détectée déclenche le téléchargement +
+// une notification système (sans redémarrage automatique).
+function onUpdateAvailable(result) {
+  if (!config.load().autoUpdate) return;
+  downloadUpdate(result);
+  try {
+    new Notification({
+      title: 'SysMon — mise à jour ' + (result.latest || ''),
+      body: 'Téléchargement de la nouvelle version démarré (dossier Téléchargements).'
+    }).show();
+  } catch { /* notification indisponible (Linux sans daemon) */ }
+}
+
+let diffWin = null;
+// Fenêtre « différences » : liste toutes les versions intermédiaires avec
+// leurs notes complètes (rendu Markdown minimal, aucune dépendance).
+function openDiffWindow(releases) {
+  if (diffWin && !diffWin.isDestroyed()) { diffWin.focus(); return; }
+  diffWin = new BrowserWindow({
+    width: 580, height: 660,
+    title: 'SysMon — Update details',
+    frame: false,
+    resizable: false,
+    autoHideMenuBar: true,
+    icon: APP_ICON,
+    backgroundColor: '#16181d',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  diffWin.loadFile(path.join(__dirname, '..', 'renderer', 'differences.html'));
+  diffWin.webContents.once('did-finish-load', () => {
+    diffWin.webContents.send('update:diff-data', releases || []);
+  });
+  const winIcon = nativeImage.createFromPath(APP_ICON);
+  if (!winIcon.isEmpty()) diffWin.setIcon(winIcon);
+  diffWin.on('closed', () => { diffWin = null; });
+}
+
 // ------------------------------------------------------------ IPC handlers --
 function applyMode(cfg) {
   masterServer.stop();
@@ -402,7 +463,7 @@ ipcMain.handle('config:set', (_e, patch) => {
   const next = config.set(patch);
   applyMode(next);
   applyAutoStart(next);
-  updater.start(next); // toggle checkUpdates → relance/arrête le timer
+  updater.start(next, onUpdateAvailable); // toggle checkUpdates → relance/arrête le timer
   // Restaurer l'icône radar si le mode barre est désactivé
   if (!(next.barMode || {}).enabled && tray) {
     tray.setImage(nativeImage.createFromPath(APP_ICON));
@@ -453,6 +514,11 @@ ipcMain.handle('history:get', () => {
 ipcMain.handle('update:check', () => updater.check());
 ipcMain.handle('update:last', () => updater.getLastCheck());
 ipcMain.handle('update:open', (_e, url) => { if (url) shell.openExternal(url); });
+ipcMain.handle('update:download', (_e, release) => { if (release) downloadUpdate(release); });
+ipcMain.handle('update:diff', () => {
+  const u = updater.getLastCheck();
+  openDiffWindow(u && u.releases ? u.releases : []);
+});
 
 // ---------------------------------------------------------------- lifecycle --
 app.whenReady().then(() => {
@@ -471,7 +537,7 @@ app.whenReady().then(() => {
   createTray();
   applyMode(cfg);
   applyAutoStart(cfg);
-  updater.start(cfg);
+  updater.start(cfg, onUpdateAvailable);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWidgetWindow();
