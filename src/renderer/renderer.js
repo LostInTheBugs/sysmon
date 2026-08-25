@@ -61,7 +61,8 @@ function applyTheme(cfg) {
 
 // --- helpers d'affichage -----------------------------------------------------
 function bar(pct, cls = '') {
-  const p = Math.max(0, Math.min(100, pct || 0));
+  // Borné numériquement — jamais de contenu injecté dans l'attribut style
+  const p = Number.isFinite(+pct) ? Math.max(0, Math.min(100, +pct)) : 0;
   return `<div class="bar"><div class="${p > 85 ? 'bad' : p > 65 ? 'warn' : cls}" style="width:${p}%"></div></div>`;
 }
 function row(k, v, cls = '') {
@@ -83,7 +84,11 @@ function fmtBytes(b) {
 function cpuSection(m) {
   if (!m || !m.ok) return section('CPU', 'unavailable', row('status', 'n/a'));
   const cores = m.perCore || [];
-  const coreBars = cores.map(l => `<span class="${l > 85 ? 'hotter' : l > 60 ? 'hot' : ''}" style="opacity:${0.25 + l / 100 * 0.75}"></span>`).join('');
+  // Valeurs numériques uniquement (opacité des pastilles par cœur)
+  const coreBars = cores.map(l => {
+    const v = Number.isFinite(+l) ? Math.max(0, Math.min(100, +l)) : 0;
+    return `<span class="${v > 85 ? 'hotter' : v > 60 ? 'hot' : ''}" style="opacity:${(0.25 + v / 100 * 0.75).toFixed(3)}"></span>`;
+  }).join('');
   return section('CPU', `${m.brand}`, `
     ${row('Usage', m.usage + '%', m.usage > 85 ? 'bad' : m.usage > 65 ? 'warn' : '')}
     ${bar(m.usage)}

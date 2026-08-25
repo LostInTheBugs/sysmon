@@ -19,7 +19,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false, discoveryPort: 8598 });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false, discoveryPort: 8598, authToken: TOKEN, bindAddress: '0.0.0.0' });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -32,7 +33,7 @@ let slaveStatuses = [];
 slave.onStatus(s => slaveStatuses.push(s.status));
 
 // Slave SANS masterIp → découverte broadcast
-config.set({ mode: 'slave', masterIp: '', port: 8597, pushIntervalMs: 1000 });
+config.set({ mode: 'slave', masterIp: '', port: 8597, pushIntervalMs: 1000, masterToken: TOKEN });
 
 setTimeout(() => slave.start(fakeSnapshot), 500);
 

@@ -68,11 +68,19 @@ main::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius
 .field { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 11px; }
 .field:last-child { margin-bottom: 0; }
 .field label { color: #aeb9c7; font-size: 12px; }
-.field input[type=text], .field input[type=number] {
+.field input[type=text], .field input[type=number], .field input[type=password] {
   background: #20242c; border: 1px solid var(--border); color: var(--text);
   border-radius: 6px; padding: 6px 10px; width: 170px; font-size: 12px;
 }
 .field input:focus { outline: none; border-color: var(--accent); }
+/* rangée jeton d'accès web (masqué, boutons 👁 / copier / régénérer) */
+.token-row { display: flex; align-items: center; gap: 5px; }
+.token-row input[type=password], .token-row input[type=text] {
+  background: #20242c; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; width: 200px; font-size: 12px;
+  font-family: Menlo, Consolas, monospace;
+}
+.token-row .mini { padding: 6px 8px; font-size: 11px; }
 .hint { color: var(--dim); font-size: 11px; margin: 4px 0 10px; line-height: 1.5; }
 
 /* --- sélecteur de thème --- */

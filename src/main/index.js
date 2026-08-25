@@ -3,10 +3,11 @@
 // Fenêtre widget (frameless, transparent, always-on-top), tray,
 // collecteurs système, mode master/slave, IPC.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const config = require('./config');
 const logger = require('./logger');
 const history = require('./history');
@@ -38,6 +39,20 @@ if (PORTABLE_MODE) {
 // Identité Windows : icône correcte dans la barre des tâches (pas de carré vide)
 app.setAppUserModelId('com.lostinthebugs.sysmon');
 
+// --- verrou d'instance unique ------------------------------------------------
+// Une seule instance de SysMon en même temps : deux instances se disputeraient
+// le port 8597, l'icône du tray et config.json (cache mémoire divergent du
+// disque). La seconde instance quitte et réveille la première (widget).
+// Les modes debug (--screenshot=) doivent pouvoir s'exécuter même si l'appli
+// tourne déjà → seconde instance autorisée dans ce cas.
+if (!process.argv.some(a => a.startsWith('--screenshot=')) && !app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (widgetWin && !widgetWin.isDestroyed()) { widgetWin.show(); widgetWin.focus(); }
+  });
+}
+
 // --- logger (buffer + fichier) ----------------------------------------------
 
 function dlog(...args) {
@@ -61,7 +76,8 @@ function createWidgetWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   widgetWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -86,7 +102,8 @@ function openSettings() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   settingsWin.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
@@ -212,23 +229,11 @@ function ensureBarCanvas() {
   barCanvasWin = new BrowserWindow({
     width: BAR_W, height: BAR_H, show: false, frame: false, transparent: true,
     skipTaskbar: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   barCanvasWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
-    `<!DOCTYPE html><html><body style="margin:0"><canvas id="c" width="${BAR_W}" height="${BAR_H}"></canvas></body></html>`
-  ));
-  barCanvasReady = new Promise(r => barCanvasWin.webContents.once('did-finish-load', r));
-  barCanvasWin.on('closed', () => { barCanvasWin = null; barCanvasReady = null; });
-  return barCanvasReady;
-}
-
-function renderBarImage(svg) {
-  ensureBarCanvas().then(() => {
-    if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
-    const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
-    const token = ++barRenderToken;
-    barCanvasWin.webContents.executeJavaScript(`
-      new Promise((resolve) => {
+    `<!DOCTYPE html><html><body style="margin:0"><canvas id="c" width="${BAR_W}" height="${BAR_H}"></canvas><script>
+      window.renderBar = (svgUrl) => new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
           const c = document.getElementById('c');
@@ -241,9 +246,23 @@ function renderBarImage(svg) {
           resolve(c.toDataURL('image/png'));
         };
         img.onerror = () => resolve(null);
-        img.src = '${svgUrl}';
-      })
-    `).then(pngUrl => {
+        img.src = svgUrl;
+      });
+    <\/script></body></html>`
+  ));
+  barCanvasReady = new Promise(r => barCanvasWin.webContents.once('did-finish-load', r));
+  barCanvasWin.on('closed', () => { barCanvasWin = null; barCanvasReady = null; });
+  return barCanvasReady;
+}
+
+function renderBarImage(svg) {
+  ensureBarCanvas().then(() => {
+    if (!barCanvasWin || barCanvasWin.isDestroyed()) return;
+    const svgUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+    const token = ++barRenderToken;
+    // renderBar() est définie dans la page ; la donnée (base64) passe par
+    // JSON.stringify — jamais de concaténation de code
+    barCanvasWin.webContents.executeJavaScript('renderBar(' + JSON.stringify(svgUrl) + ')').then(pngUrl => {
       if (token !== barRenderToken) return; // un rendu plus récent est en cours
       if (pngUrl && tray) {
         const img = nativeImage.createFromDataURL(pngUrl);
@@ -302,7 +321,7 @@ function rebuildTrayMenu() {
     { label: 'Show widget', click: () => { if (widgetWin) widgetWin.show(); } },
     { label: 'Settings…', click: openSettings },
     ...(cfg.mode === 'master' && cfg.webAccess ? [
-      { label: 'Open web dashboard', click: () => shell.openExternal(`http://localhost:${cfg.port}`) }
+      { label: 'Open web dashboard', click: () => shell.openExternal(`http://localhost:${cfg.port}/?token=${cfg.authToken}`) }
     ] : []),
     { type: 'separator' },
     { label: 'Mode: ' + cfg.mode, enabled: false },
@@ -336,6 +355,68 @@ function applyAutoStart(cfg) {
   }
 }
 
+// --- mises à jour : téléchargement, autoUpdate, fenêtre de différences -------
+// Artefact adapté à la plateforme (.exe / .dmg / .AppImage) parmi les assets
+// de la release GitHub ; null si aucun asset ne correspond.
+function assetForPlatform(release) {
+  const pat = process.platform === 'win32' ? /\.exe$/i
+    : process.platform === 'darwin' ? /\.dmg$/i
+    : /\.AppImage$/i;
+  return (release.assets || []).find(a => pat.test(a.name)) || null;
+}
+
+// Pas de remplacement de binaire en place (hors périmètre, risqué) : on lance
+// le téléchargement de l'artefact adapté dans le navigateur (dossier de
+// téléchargements) puis on ouvre ce dossier.
+function downloadUpdate(release) {
+  const asset = assetForPlatform(release);
+  if (asset && asset.url) shell.openExternal(asset.url);
+  else shell.openExternal(release.html_url || release.url);
+  try { shell.openPath(app.getPath('downloads')); } catch { /* ignore */ }
+}
+
+// autoUpdate : une nouvelle version détectée déclenche le téléchargement +
+// une notification système (sans redémarrage automatique).
+function onUpdateAvailable(result) {
+  if (!config.load().autoUpdate) return;
+  downloadUpdate(result);
+  try {
+    new Notification({
+      title: 'SysMon — mise à jour ' + (result.latest || ''),
+      body: 'Téléchargement de la nouvelle version démarré (dossier Téléchargements).'
+    }).show();
+  } catch { /* notification indisponible (Linux sans daemon) */ }
+}
+
+let diffWin = null;
+// Fenêtre « différences » : liste toutes les versions intermédiaires avec
+// leurs notes complètes (rendu Markdown minimal, aucune dépendance).
+function openDiffWindow(releases) {
+  if (diffWin && !diffWin.isDestroyed()) { diffWin.focus(); return; }
+  diffWin = new BrowserWindow({
+    width: 580, height: 660,
+    title: 'SysMon — Update details',
+    frame: false,
+    resizable: false,
+    autoHideMenuBar: true,
+    icon: APP_ICON,
+    backgroundColor: '#16181d',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  diffWin.loadFile(path.join(__dirname, '..', 'renderer', 'differences.html'));
+  diffWin.webContents.once('did-finish-load', () => {
+    diffWin.webContents.send('update:diff-data', releases || []);
+  });
+  const winIcon = nativeImage.createFromPath(APP_ICON);
+  if (!winIcon.isEmpty()) diffWin.setIcon(winIcon);
+  diffWin.on('closed', () => { diffWin = null; });
+}
+
 // ------------------------------------------------------------ IPC handlers --
 function applyMode(cfg) {
   masterServer.stop();
@@ -352,6 +433,11 @@ function applyMode(cfg) {
         }
       });
       logger.info('main', 'master server started on port', cfg.port);
+      // Piège réseau : en local uniquement, la découverte UDP annonce le master
+      // mais les slaves distants ne peuvent pas s'y connecter (refus TCP)
+      if (cfg.bindAddress === '127.0.0.1') {
+        logger.warn('main', 'master bound to 127.0.0.1 — remote slaves will be discovered but cannot connect; set bindAddress to 0.0.0.0 in Settings for LAN use');
+      }
     } else if (cfg.mode === 'slave') {
       slaveClient.start(() => latestSnapshot);
     }
@@ -362,14 +448,23 @@ function applyMode(cfg) {
   rebuildTrayMenu();
 }
 
-// Config poussée par le maître au slave (modules, cadence, logLevel)
+// Config poussée par le maître au slave (modules, cadence, logLevel, syncMode).
+// Le patch reçu est APPLIQUÉ puis persisté — avant 2026.08.045, il était
+// testé puis ignoré au profit de la config locale (modules jamais désactivés).
 slaveClient.onConfig(clean => {
-  const cfg = config.load();
-  if (clean.modules) collectors.setEnabled(cfg.modules);
+  const patch = {};
+  if (clean.modules) patch.modules = clean.modules;
+  if (clean.pushIntervalMs) patch.pushIntervalMs = clean.pushIntervalMs;
+  if (clean.logLevel) patch.logLevel = clean.logLevel;
+  if (clean.syncMode) patch.syncMode = clean.syncMode;
+  const next = Object.keys(patch).length ? config.set(patch) : config.load();
+  // Appliquer réellement les modules (la boucle de collecte n'émet plus les
+  // modules désactivés → ils disparaissent des snapshots poussés au master)
+  collectors.setEnabled(next.modules);
   logger.info('slave', 'remote config from master:', JSON.stringify(clean));
   // Refléter dans les fenêtres ouvertes (thème inchangé, mais modules…)
   for (const w of [widgetWin, settingsWin]) {
-    if (w && !w.isDestroyed()) w.webContents.send('config', cfg);
+    if (w && !w.isDestroyed()) w.webContents.send('config', next);
   }
 });
 
@@ -378,7 +473,7 @@ ipcMain.handle('config:set', (_e, patch) => {
   const next = config.set(patch);
   applyMode(next);
   applyAutoStart(next);
-  updater.start(next); // toggle checkUpdates → relance/arrête le timer
+  updater.start(next, onUpdateAvailable); // toggle checkUpdates → relance/arrête le timer
   // Restaurer l'icône radar si le mode barre est désactivé
   if (!(next.barMode || {}).enabled && tray) {
     tray.setImage(nativeImage.createFromPath(APP_ICON));
@@ -401,7 +496,16 @@ ipcMain.handle('slaves:set', (_e, id, action) => {
 });
 ipcMain.handle('open:dashboard', (_e) => {
   const cfg = config.load();
-  shell.openExternal(`http://localhost:${cfg.port}`);
+  shell.openExternal(`http://localhost:${cfg.port}/?token=${cfg.authToken}`);
+});
+// Régénère le jeton d'accès web (l'ancien devient invalide ; tous les clients
+// WebSocket sont déconnectés et devront se reconnecter avec le nouveau jeton)
+ipcMain.handle('auth:regenerate', () => {
+  const token = crypto.randomBytes(24).toString('hex');
+  config.set({ authToken: token });
+  masterServer.disconnectClients();
+  logger.info('main', 'web access token regenerated');
+  return token;
 });
 ipcMain.handle('open:settings', () => openSettings());
 ipcMain.handle('sysinfo:refresh', async () => {
@@ -420,10 +524,23 @@ ipcMain.handle('history:get', () => {
 ipcMain.handle('update:check', () => updater.check());
 ipcMain.handle('update:last', () => updater.getLastCheck());
 ipcMain.handle('update:open', (_e, url) => { if (url) shell.openExternal(url); });
+ipcMain.handle('update:download', (_e, release) => { if (release) downloadUpdate(release); });
+ipcMain.handle('update:diff', () => {
+  const u = updater.getLastCheck();
+  openDiffWindow(u && u.releases ? u.releases : []);
+});
 
 // ---------------------------------------------------------------- lifecycle --
 app.whenReady().then(() => {
   console.log('[sysmon] whenReady, config mode =', config.load().mode);
+  // Garde-fou de navigation (T14) : aucune fenêtre ne doit ouvrir de popup ni
+  // naviguer hors de ses pages locales. Les liens externes passent par
+  // shell.openExternal (hors navigation). La barCanvas charge une data: URL —
+  // will-navigate ne se déclenche pas au premier loadURL, vérifié.
+  app.on('web-contents-created', (_e, contents) => {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    contents.on('will-navigate', e => e.preventDefault());
+  });
   const cfg = config.load();
   collectors.start(snap => {
     latestSnapshot = snap;
@@ -438,7 +555,7 @@ app.whenReady().then(() => {
   createTray();
   applyMode(cfg);
   applyAutoStart(cfg);
-  updater.start(cfg);
+  updater.start(cfg, onUpdateAvailable);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWidgetWindow();
@@ -472,4 +589,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   // L'appli vit dans le tray — ne pas quitter
+});
+
+// Vider la file d'écriture du journal avant de quitter (pas de perte de logs).
+// flushSync : le flush() asynchrone n'a aucune garantie d'aboutir avant la
+// sortie du process (le rappel d'appendFile peut ne jamais s'exécuter).
+app.on('before-quit', () => {
+  logger.flushSync();
 });

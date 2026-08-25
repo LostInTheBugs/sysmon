@@ -20,7 +20,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 500 });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 500, authToken: TOKEN });
 
 const logger = require('../src/main/logger');
 const master = require('../src/main/master/server');
@@ -29,7 +30,7 @@ const slave = require('../src/main/slave/client');
 const fakeSnapshot = () => ({ timestamp: Date.now(), host: { hostname: os.hostname(), platform: 'linux' }, modules: {} });
 
 master.start({ getSnapshot: fakeSnapshot, onChange: () => {} });
-setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597 }); slave.start(fakeSnapshot); }, 300);
+setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, masterToken: TOKEN }); slave.start(fakeSnapshot); }, 300);
 
 // Le "slave" génère un log après connexion → doit remonter au master
 setTimeout(() => logger.info('slavetest', 'hello-from-slave-42'), 2000);
@@ -39,12 +40,12 @@ const t0 = Date.now();
 const check = setInterval(async () => {
   try {
     const host = encodeURIComponent(os.hostname());
-    const r = await fetch(`http://127.0.0.1:8597/api/logs?host=${host}&limit=300`);
+    const r = await fetch(`http://127.0.0.1:8597/api/logs?host=${host}&limit=300&token=${TOKEN}`);
     const data = await r.json();
     const entries = (data.hosts && data.hosts[os.hostname()]) || [];
     const found = entries.find(e => e.msg && e.msg.includes(MARKER));
     // Le master doit aussi avoir ses propres logs
-    const r2 = await fetch('http://127.0.0.1:8597/api/logs?host=master&limit=50');
+    const r2 = await fetch(`http://127.0.0.1:8597/api/logs?host=master&limit=50&token=${TOKEN}`);
     const data2 = await r2.json();
     const masterEntries = (data2.hosts && data2.hosts.master) || [];
     if (found && masterEntries.length) {

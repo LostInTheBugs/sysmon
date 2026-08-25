@@ -21,7 +21,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false, authToken: TOKEN });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -33,7 +34,7 @@ const fakeSnapshot = () => ({
 });
 
 // slave config → IP directe du master (loopback)
-config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, pushIntervalMs: 1000 });
+config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, pushIntervalMs: 1000, masterToken: TOKEN });
 
 let slaveStatuses = [];
 slave.onStatus(s => slaveStatuses.push(s.status));

@@ -9,11 +9,15 @@ contextBridge.exposeInMainWorld('sysmon', {
   setConfig: patch => ipcRenderer.invoke('config:set', patch),
   listSlaves: () => ipcRenderer.invoke('slaves:list'),
   setSlave: (id, action) => ipcRenderer.invoke('slaves:set', id, action),
+  authRegenerate: () => ipcRenderer.invoke('auth:regenerate'),
   openDashboard: () => ipcRenderer.invoke('open:dashboard'),
   openSettings: () => ipcRenderer.invoke('open:settings'),
   refresh: () => ipcRenderer.invoke('sysinfo:refresh'),
   getHistory: () => ipcRenderer.invoke('history:get'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   getUpdate: () => ipcRenderer.invoke('update:last'),
-  openUpdate: url => ipcRenderer.invoke('update:open', url)
+  openUpdate: url => ipcRenderer.invoke('update:open', url),
+  downloadUpdate: release => ipcRenderer.invoke('update:download', release),
+  showDiff: () => ipcRenderer.invoke('update:diff'),
+  onDiffData: cb => ipcRenderer.on('update:diff-data', (_e, releases) => cb(releases))
 });

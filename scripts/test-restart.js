@@ -28,7 +28,8 @@ process.on('uncaughtException', e => {
 });
 
 const config = require('../src/main/config');
-config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, discoveryPort: 8598, pushIntervalMs: 500 });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, discoveryPort: 8598, pushIntervalMs: 500, authToken: TOKEN, masterToken: TOKEN });
 
 const slave = require('../src/main/slave/client');
 const master = require('../src/main/master/server');
