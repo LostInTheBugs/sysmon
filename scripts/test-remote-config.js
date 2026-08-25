@@ -21,7 +21,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: false, syncMode: 'push' });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: false, syncMode: 'push', authToken: TOKEN });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -38,7 +39,7 @@ let snapCount = 0;
 
 master.start({ getSnapshot: fakeSnapshot, onChange: () => {} });
 setTimeout(() => {
-  config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597 });
+  config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, masterToken: TOKEN });
   slave.onConfig(cfg => { receivedConfig = cfg; });
   slave.onStatus(s => { if (s.status === 'connected') snapCount++; });
   slave.start(fakeSnapshot);
@@ -48,13 +49,13 @@ const t0 = Date.now();
 const check = setInterval(async () => {
   try {
     // 1. trouver l'id du slave approuvé
-    const r = await fetch('http://127.0.0.1:8597/api/slaves');
+    const r = await fetch(`http://127.0.0.1:8597/api/slaves?token=${TOKEN}`);
     const list = await r.json();
     const s = list.find(x => x.status === 'approved');
     if (!s) return;
     // 2. pousser une config distante (modules réduits + cadence 1s + warn)
     const cfgPatch = { modules: { cpu: true, memory: true, disks: false, battery: false, network: false, connectivity: false, sensors: false, gpu: false, llm: false, vms: false }, pushIntervalMs: 1000, logLevel: 'warn' };
-    await fetch('http://127.0.0.1:8597/api/slave-config', {
+    await fetch(`http://127.0.0.1:8597/api/slave-config?token=${TOKEN}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: s.id, config: cfgPatch })
     });

@@ -128,7 +128,9 @@ function connect() {
     return;
   }
   const port = discoveredMaster && !cfg.masterIp ? discoveredMaster.port : cfg.port;
-  const url = `ws://${target}:${port}/ws`;
+  // Le jeton du master est exigé depuis 2026.08.045 (T2) : passé en query
+  // string (validé côté master avant tout traitement de message)
+  const url = `ws://${target}:${port}/ws${cfg.masterToken ? '?token=' + encodeURIComponent(cfg.masterToken) : ''}`;
   notifyStatus('connecting', { url });
   let sock;
   try {
@@ -152,7 +154,8 @@ function connect() {
       name: os.hostname(),
       hostname: os.hostname(),
       platform: process.platform,
-      version: pkg.version
+      version: pkg.version,
+      token: config.load().masterToken || undefined
     }));
     timer = setInterval(() => {
       if (ws !== sock) return;

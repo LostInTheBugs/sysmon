@@ -21,7 +21,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: false, pushIntervalMs: 500 });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: false, pushIntervalMs: 500, authToken: TOKEN });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -38,7 +39,7 @@ const masterSnap = () => ({
 });
 
 master.start({ getSnapshot: masterSnap, onChange: () => {} });
-setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597 }); slave.start(slaveSnap); }, 300);
+setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, masterToken: TOKEN }); slave.start(slaveSnap); }, 300);
 
 const t0 = Date.now();
 const check = setInterval(() => {
@@ -49,7 +50,7 @@ const check = setInterval(() => {
 // Client dashboard
 let gotSnapshots = 0;
 let lastHosts = null;
-const ws = new WebSocket('ws://127.0.0.1:8597/ws');
+const ws = new WebSocket(`ws://127.0.0.1:8597/ws?token=${TOKEN}`);
 ws.on('open', () => ws.send(JSON.stringify({ type: 'subscribe' })));
 ws.on('message', raw => {
   try {

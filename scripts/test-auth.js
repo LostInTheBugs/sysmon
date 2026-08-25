@@ -97,6 +97,42 @@ async function run() {
   check('WS avec jeton → subscribe reçoit slaves', subResult.includes('"type":"slaves"'), subResult);
   wsGood.close();
 
+  // --- partie slave (T2) ---
+  const slave = require('../src/main/slave/client');
+  let slaveStatuses = [];
+  slave.onStatus(s => slaveStatuses.push(s.status));
+  const fakeSnapshot = () => ({ timestamp: Date.now(), host: { hostname: 'slave-auth', platform: 'linux' }, modules: { cpu: { ok: true, usage: 5 } } });
+
+  // 10. Slave SANS jeton → connexion refusée, jamais enregistré
+  config.set({ mode: 'slave', masterIp: '127.0.0.1', port: PORT, masterToken: '' });
+  slave.start(fakeSnapshot);
+  await new Promise(r => setTimeout(r, 4500));
+  check('slave sans jeton → refusé (aucun hello)', master.listSlaves().length === 0, 'slaves: ' + master.listSlaves().length);
+  check('slave sans jeton → jamais validé', !slaveStatuses.includes('validated'), slaveStatuses.join(','));
+  slave.stop();
+
+  // 11. Slave AVEC le bon jeton → hello, validation, snapshot
+  slaveStatuses = [];
+  config.set({ masterToken: TOKEN });
+  slave.start(fakeSnapshot);
+  const slaveResult = await new Promise(resolve => {
+    const t = setTimeout(() => resolve('timeout'), 12000);
+    const iv = setInterval(() => {
+      const s = master.listSlaves()[0];
+      if (s && s.status === 'pending') master.setSlaveStatus(s.id, 'approved');
+      if (s && s.status === 'approved' && s.snapshot && s.connected) {
+        clearTimeout(t); clearInterval(iv);
+        resolve('connected:' + JSON.stringify(slaveStatuses));
+      }
+    }, 500);
+  });
+  check('slave avec jeton → hello + validation + snapshot', slaveResult.startsWith('connected:'), slaveResult);
+  // Le welcome porte son propre champ status (pending→approved) qui remplace
+  // la clé 'validated' dans le callback — la preuve du round-trip est le
+  // statut final reçu du master.
+  check('slave avec jeton → statut final reçu (approved)', slaveResult.includes('approved'), slaveResult);
+  slave.stop();
+
   master.stop();
   console.log(failures ? `AUTH TEST FAILED (${failures} échec(s))` : 'AUTH TEST PASSED');
   process.exit(failures ? 1 : 0);

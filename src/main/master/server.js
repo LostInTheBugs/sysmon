@@ -94,6 +94,10 @@ function checkOrigin(origin) {
 }
 
 // Page 401 servie quand le dashboard est ouvert sans jeton valide
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+  'X-Content-Type-Options': 'nosniff'
+};
 const UNAUTHORIZED_HTML = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><title>SysMon — Accès refusé</title>
 <style>body{background:#0a0e14;color:#cfd8dc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
@@ -361,7 +365,7 @@ function start({ getSnapshot: gs, onChange }) {
       return;
     }
     if (!auth) {
-      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8', ...SECURITY_HEADERS });
       res.end(UNAUTHORIZED_HTML);
       return;
     }
@@ -377,22 +381,25 @@ function start({ getSnapshot: gs, onChange }) {
     // (pas de script inline — CSP script-src 'self').
     if (ext === '.html') {
       const html = fs.readFileSync(full, 'utf8').replace('<head>', `<head><meta name="sysmon-token" content="${cfg.authToken}">`);
-      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', ...SECURITY_HEADERS });
       res.end(html);
       return;
     }
-    res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', ...SECURITY_HEADERS });
     fs.createReadStream(full).pipe(res);
   });
 
-  wss = new WebSocketServer({ server, path: '/ws' });
+  wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2 * 1024 * 1024 });
   wss.on('connection', (ws, req) => {
     const ip = req.socket.remoteAddress;
     // Authentification : le jeton passe en query string (/ws?token=…), ou en
     // cookie pour les dashboards déjà connectés. Refus avant tout traitement.
     const url = new URL(req.url, `http://${req.headers.host}`);
-    if (!authorized(req, url)) {
-      dlog('websocket rejected (unauthorized) from', ip);
+    // Anti cross-site WebSocket hijacking : si un en-tête Origin est présent
+    // (navigateur → dashboard), il doit être localhost/loopback/une IP du
+    // master. Les clients natifs (slaves) n'envoient pas d'Origin.
+    if (!authorized(req, url) || (req.headers.origin && !checkOrigin(req.headers.origin))) {
+      dlog('websocket rejected (unauthorized or bad origin) from', ip);
       ws.close(4401, 'unauthorized');
       return;
     }
@@ -458,8 +465,10 @@ function start({ getSnapshot: gs, onChange }) {
       const req = JSON.parse(msg.toString());
       if (req.type === 'SYSMON_DISCOVER') {
         dlog('SYSMON_DISCOVER from', rinfo.address + ':' + rinfo.port, '(' + (req.name || '?') + ')');
+        // La réponse ne contient JAMAIS le jeton — service de découverte uniquement
         const reply = JSON.stringify({ type: 'SYSMON_MASTER', name: os.hostname(), port: cfg.port });
         udpSock.send(reply, 0, reply.length, rinfo.port, rinfo.address);
+        logger.info('master', 'discovery reply sent to', rinfo.address + ':' + rinfo.port, '(' + (req.name || '?') + ')');
       }
     } catch { /* ignore */ }
   });

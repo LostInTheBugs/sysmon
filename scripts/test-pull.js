@@ -20,7 +20,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: false, syncMode: 'pull' });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: false, syncMode: 'pull', authToken: TOKEN });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -36,7 +37,7 @@ const fakeSnapshot = () => ({
 // push périodique et ne répond qu'aux demandes du master.
 master.start({ getSnapshot: fakeSnapshot, onChange: () => {} });
 setTimeout(() => {
-  config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597 });
+  config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, masterToken: TOKEN });
   slave.start(fakeSnapshot);
 }, 300);
 
@@ -48,7 +49,7 @@ let lastTs = null;
 const { WebSocket } = require('ws');
 let wsDash;
 setTimeout(() => {
-  wsDash = new WebSocket('ws://127.0.0.1:8597/ws');
+  wsDash = new WebSocket(`ws://127.0.0.1:8597/ws?token=${TOKEN}`);
   wsDash.on('open', () => wsDash.send(JSON.stringify({ type: 'subscribe' })));
   wsDash.on('message', raw => {
     try {

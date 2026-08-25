@@ -20,7 +20,8 @@ require.cache[require.resolve('electron')] = {
 };
 
 const config = require('../src/main/config');
-config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: true, historyMinutes: 30 });
+const TOKEN = 'test-token-1234567890abcdef';
+config.set({ mode: 'master', port: 8597, discoveryPort: 8598, masterIp: '', autoApproveSlaves: true, pushIntervalMs: 300, historyEnabled: true, historyMinutes: 30, authToken: TOKEN });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');
@@ -40,13 +41,13 @@ const fakeSnapshot = () => ({
 });
 
 master.start({ getSnapshot: fakeSnapshot, onChange: () => {} });
-setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597 }); slave.start(fakeSnapshot); }, 300);
+setTimeout(() => { config.set({ mode: 'slave', masterIp: '127.0.0.1', port: 8597, masterToken: TOKEN }); slave.start(fakeSnapshot); }, 300);
 
 const t0 = Date.now();
 const check = setInterval(async () => {
   try {
     const host = encodeURIComponent(os.hostname());
-    const r = await fetch(`http://127.0.0.1:8597/api/history?host=${host}&minutes=30`);
+    const r = await fetch(`http://127.0.0.1:8597/api/history?host=${host}&minutes=30&token=${TOKEN}`);
     const data = await r.json();
     const series = data.hosts && data.hosts[os.hostname()];
     const cpu = (series && series.cpu) || [];
