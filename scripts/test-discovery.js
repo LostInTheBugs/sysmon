@@ -20,7 +20,7 @@ require.cache[require.resolve('electron')] = {
 
 const config = require('../src/main/config');
 const TOKEN = 'test-token-1234567890abcdef';
-config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false, discoveryPort: 8598, authToken: TOKEN });
+config.set({ mode: 'master', port: 8597, masterIp: '', autoApproveSlaves: false, discoveryPort: 8598, authToken: TOKEN, bindAddress: '0.0.0.0' });
 
 const master = require('../src/main/master/server');
 const slave = require('../src/main/slave/client');

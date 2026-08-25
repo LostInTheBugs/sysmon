@@ -9,6 +9,8 @@
   "scripts": {
     "start": "electron .",
     "start:no-sandbox": "electron . --no-sandbox",
+    "test": "node scripts/run-all.js",
+    "lint": "node scripts/check-version.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
