@@ -21,6 +21,89 @@ const MAX_HOST_LOGS = 300;
 // Compat : les anciens appels dlog() passent par le logger central
 function dlog(...args) { logger.debug('master', ...args); }
 
+// --- Authentification par jeton ----------------------------------------------
+// Le jeton est généré au premier démarrage (config.authToken). Il est exigé
+// sur toutes les routes /api/* et sur le WebSocket :
+//   - en-tête Authorization: Bearer <jeton>
+//   - paramètre ?token= (dashboard ouvert depuis le tray, WebSocket)
+//   - cookie HttpOnly sysmon_token (posé après validation du ?token — sert
+//     uniquement à servir la page statique et les GET /api/*)
+// Comparaison à temps constant (timingSafeEqual) pour ne pas fuir le jeton.
+
+function tokenMatches(given, expected) {
+  if (!expected || typeof given !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function extractToken(req, url) {
+  // 1. en-tête Authorization: Bearer xxx
+  const h = req.headers['authorization'] || '';
+  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+  if (m) return m[1].trim();
+  // 2. paramètre de requête ?token=
+  const q = url.searchParams.get('token');
+  if (q) return q;
+  // 3. cookie sysmon_token
+  const cookie = req.headers.cookie || '';
+  for (const part of cookie.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === 'sysmon_token') return part.slice(eq + 1).trim();
+  }
+  return null;
+}
+
+// Jeton hors cookie (en-tête Authorization ou ?token=) — exigé pour les routes
+// mutantes : un site tiers ne peut pas forger ces deux-là (anti-CSRF), le cookie
+// seul ne suffit donc pas pour POST /api/slaves/* et /api/slave-config.
+function tokenFromHeaderOrQuery(req, url) {
+  const h = req.headers['authorization'] || '';
+  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+  if (m) return m[1].trim();
+  return url.searchParams.get('token');
+}
+
+// allowCookie=false : le cookie ne compte pas (routes mutantes).
+function authorized(req, url, opts = {}) {
+  const token = opts.allowCookie === false ? tokenFromHeaderOrQuery(req, url) : extractToken(req, url);
+  if (token == null) return false;
+  return tokenMatches(token, config.load().authToken);
+}
+
+// Origine des connexions WebSocket de type dashboard : localhost, loopback ou
+// une IP locale du master. Les clients natifs (slaves) n'envoient pas d'Origin.
+function checkOrigin(origin) {
+  try {
+    const o = new URL(origin);
+    if (o.protocol !== 'http:' && o.protocol !== 'https:') return false;
+    const port = config.load().port;
+    const hosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`]);
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const i of ifaces[name] || []) {
+        if (i.family === 'IPv4' && !i.internal) hosts.add(`${i.address}:${port}`);
+      }
+    }
+    return hosts.has(o.host);
+  } catch {
+    return false;
+  }
+}
+
+// Page 401 servie quand le dashboard est ouvert sans jeton valide
+const UNAUTHORIZED_HTML = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><title>SysMon — Accès refusé</title>
+<style>body{background:#0a0e14;color:#cfd8dc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{max-width:460px;padding:32px;background:#16181d;border:1px solid #23272f;border-radius:10px}
+h1{font-size:18px;color:#fff;margin:0 0 12px}p{line-height:1.5;color:#8b97a5;margin:0 0 8px}code{background:#0a0e14;padding:2px 6px;border-radius:4px}</style></head>
+<body><div class="card"><h1>🔒 Accès refusé (401)</h1>
+<p>Le dashboard web est protégé par un jeton d'authentification.</p>
+<p>Ouvrez-le depuis l'application : <b>Paramètres → Options du maître → Jeton d'accès web</b>, puis <b>Ouvrir le dashboard</b> dans le menu du tray.</p>
+<p>En CLI : <code>curl "http://localhost:8597/?token=&lt;jeton&gt;"</code></p></div></body></html>`;
+
 let server = null;
 let wss = null;
 let udpSock = null;
@@ -183,12 +266,21 @@ function start({ getSnapshot: gs, onChange }) {
   getSnapshot = gs;
   onSlavesChange = onChange;
   loadSlaves();
+  // Jeton d'authentification : généré au premier démarrage du master, persisté
+  if (!config.load().authToken) config.set({ authToken: crypto.randomBytes(24).toString('hex') });
   const cfg = config.load();
 
   server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    // --- API REST ---
-    if (url.pathname === '/api/status') {
+    const auth = authorized(req, url);
+    const authNoCookie = authorized(req, url, { allowCookie: false });
+    const deny = () => { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'unauthorized' })); };
+    // --- API REST : tout /api/* est authentifié. Les routes mutantes exigent
+    // le jeton hors cookie (Authorization ou ?token=) — anti-CSRF (T4). ---
+    if (url.pathname.startsWith('/api/')) {
+      const mutating = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
+      if (!(mutating ? authNoCookie : auth)) { deny(); return; }
+      if (url.pathname === '/api/status') {
       const cfg = config.load();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -258,15 +350,37 @@ function start({ getSnapshot: gs, onChange }) {
       res.end(JSON.stringify({ hosts }));
       return;
     }
-    // --- Dashboard web ---
+    }
+    // --- Dashboard web (authentifié) ---
+    // ?token= valide → poser le cookie HttpOnly puis rediriger sans le jeton
+    // dans la barre d'adresse. Les sous-requêtes (css/js/api) passent ensuite
+    // par le cookie.
+    if (url.pathname === '/' && url.searchParams.get('token') && tokenMatches(url.searchParams.get('token'), cfg.authToken)) {
+      res.writeHead(302, { Location: '/', 'Set-Cookie': `sysmon_token=${cfg.authToken}; HttpOnly; SameSite=Strict; Path=/` });
+      res.end();
+      return;
+    }
+    if (!auth) {
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(UNAUTHORIZED_HTML);
+      return;
+    }
     let file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    file = path.normalize(file).replace(/^(\.\.[\/\\])+/, '');
+    file = path.normalize(file).replace(/^(\.\.([/\\]|$))+/, '');
     const full = path.join(WEB_DIR, file);
     if (!full.startsWith(WEB_DIR) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
       res.writeHead(404); res.end('Not found'); return;
     }
     const ext = path.extname(full);
     const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript' };
+    // Le dashboard connaît le jeton (WS + appels API) : injecté dans un <meta>
+    // (pas de script inline — CSP script-src 'self').
+    if (ext === '.html') {
+      const html = fs.readFileSync(full, 'utf8').replace('<head>', `<head><meta name="sysmon-token" content="${cfg.authToken}">`);
+      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+      res.end(html);
+      return;
+    }
     res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
     fs.createReadStream(full).pipe(res);
   });
@@ -274,6 +388,14 @@ function start({ getSnapshot: gs, onChange }) {
   wss = new WebSocketServer({ server, path: '/ws' });
   wss.on('connection', (ws, req) => {
     const ip = req.socket.remoteAddress;
+    // Authentification : le jeton passe en query string (/ws?token=…), ou en
+    // cookie pour les dashboards déjà connectés. Refus avant tout traitement.
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    if (!authorized(req, url)) {
+      dlog('websocket rejected (unauthorized) from', ip);
+      ws.close(4401, 'unauthorized');
+      return;
+    }
     dlog('websocket connection from', ip);
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
@@ -356,4 +478,10 @@ function stop() {
   slaveLogs.clear();
 }
 
-module.exports = { start, stop, listSlaves, setSlaveStatus, setSlaveConfig, getLogs };
+// Déconnecte tous les clients WebSocket (régénération du jeton : ils se
+// reconnecteront avec l'ancien jeton et seront refusés).
+function disconnectClients() {
+  if (wss) for (const ws of wss.clients) ws.terminate();
+}
+
+module.exports = { start, stop, disconnectClients, listSlaves, setSlaveStatus, setSlaveConfig, getLogs };

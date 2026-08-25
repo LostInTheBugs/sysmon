@@ -8,6 +8,9 @@ const DEFAULTS = {
   port: Number(process.env.PORT) || 8597,
   discoveryPort: 8598,
   masterIp: '',
+  masterToken: '',        // jeton d'accès au master (mode esclave — T2)
+  authToken: '',          // généré au premier démarrage du master
+  bindAddress: '127.0.0.1', // '127.0.0.1' | '0.0.0.0' — exposition LAN explicite
   autoApproveSlaves: false,
   webAccess: true,
   pushIntervalMs: 2000,

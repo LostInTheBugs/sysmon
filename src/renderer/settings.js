@@ -18,6 +18,9 @@ async function load() {
   renderModules();
   refreshSlaves();
   $('#port').value = config.port;
+  $('#bindAddress').value = config.bindAddress || '127.0.0.1';
+  $('#authToken').value = config.authToken || '';
+  $('#masterToken').value = config.masterToken || '';
   $('#webAccess').checked = !!config.webAccess;
   $('#autoApproveSlaves').checked = !!config.autoApproveSlaves;
   $('#masterIp').value = config.masterIp || '';
@@ -64,6 +67,24 @@ $('#btnCheckUpdates').addEventListener('click', async () => {
   const box = $('#update-result');
   box.textContent = sysmonI18n.t('update.checking');
   renderUpdateResult(await window.sysmon.checkUpdate());
+});
+
+// --- jeton d'accès web : afficher / copier / régénérer -----------------------
+$('#btnTokenShow').addEventListener('click', () => {
+  const input = $('#authToken');
+  input.type = input.type === 'password' ? 'text' : 'password';
+});
+$('#btnTokenCopy').addEventListener('click', async () => {
+  const v = $('#authToken').value;
+  if (!v) return;
+  try {
+    await navigator.clipboard.writeText(v);
+    $('#btnTokenCopy').textContent = '✓';
+    setTimeout(() => { $('#btnTokenCopy').textContent = sysmonI18n.t('btn.copy'); }, 1500);
+  } catch { /* presse-papiers indisponible */ }
+});
+$('#btnTokenRegen').addEventListener('click', async () => {
+  $('#authToken').value = await window.sysmon.authRegenerate();
 });
 
 // Changement de langue → application en direct (sans attendre Enregistrer)
@@ -169,7 +190,9 @@ $('#save').addEventListener('click', async () => {
       webAccess: $('#webAccess').checked,
       autoApproveSlaves: $('#autoApproveSlaves').checked,
       port: parseInt($('#port').value, 10) || 8597,
+      bindAddress: $('#bindAddress').value === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1',
       masterIp: $('#masterIp').value.trim(),
+      masterToken: $('#masterToken').value.trim(),
       theme: document.body.dataset.theme || 'dark',
       accent: $('#accent').value,
       logLevel: $('#logLevel').value,

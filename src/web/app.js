@@ -24,6 +24,16 @@ document.getElementById('btn-theme').addEventListener('click', () => {
   applyTheme(THEMES[(cur + 1) % THEMES.length]);
 });
 
+// --- jeton d'accès web --------------------------------------------------------
+// Le master l'injecte dans un <meta> de la page (le cookie ne suffit pas pour
+// les routes mutantes et le WebSocket). Conservé en mémoire JS uniquement.
+const TOKEN = (document.querySelector('meta[name="sysmon-token"]') || {}).content || '';
+function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (TOKEN) headers.Authorization = 'Bearer ' + TOKEN;
+  return fetch(path, { ...opts, headers });
+}
+
 // --- logs centralisés ---------------------------------------------------------
 const logBuffer = []; // {ts, level, host, tag, msg}
 const logHosts = new Set();
@@ -45,7 +55,7 @@ function renderLogs() {
 }
 async function refreshLogs() {
   try {
-    const r = await fetch('/api/logs?limit=400');
+    const r = await api('/api/logs?limit=400');
     const data = await r.json();
     for (const [host, entries] of Object.entries(data.hosts || {})) {
       for (const e of entries) {
@@ -74,7 +84,7 @@ let curvesMode = false;
 const HIST_KEYS = ['cpu', 'mem', 'gpu', 'netRx', 'netTx', 'temp'];
 async function refreshHistory() {
   try {
-    const r = await fetch('/api/history?minutes=30');
+    const r = await api('/api/history?minutes=30');
     historyData = await r.json();
     if (curvesMode) refreshCurves();
   } catch { /* master redémarrage */ }
@@ -130,7 +140,7 @@ function historyCharts(histKey) {
 }
 
 // --- langue : celle du master (config.language), sinon détection navigateur ---
-fetch('/api/status').then(r => r.json()).then(st => {
+api('/api/status').then(r => r.json()).then(st => {
   sysmonI18n.setLang(st.language || 'auto');
   sysmonI18n.apply(document);
   applyLogsFilters();
@@ -173,7 +183,7 @@ async function saveCfg() {
     logLevel: document.getElementById('cfg-loglevel').value
   };
   try {
-    const r = await fetch('/api/slave-config', {
+    const r = await api('/api/slave-config', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: cfgSlaveId, config: cfg })
     });
@@ -190,7 +200,7 @@ async function saveCfg() {
 }
 
 async function resetCfg() {
-  const r = await fetch('/api/slave-config', {
+  const r = await api('/api/slave-config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: cfgSlaveId, config: { modules: null, pushIntervalMs: null, logLevel: null } })
   });
@@ -342,7 +352,7 @@ function renderSlavesBar(slaves) {
       <button data-id="${s.id}" data-act="approve">${sysmonI18n.t('dash.approve')}</button><button data-id="${s.id}" data-act="reject">${sysmonI18n.t('dash.reject')}</button>`;
     div.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await fetch(`/api/slaves/${btn.dataset.id}/${btn.dataset.act}`, { method: 'POST' });
+        await api(`/api/slaves/${btn.dataset.id}/${btn.dataset.act}`, { method: 'POST' });
       });
     });
     wrap.appendChild(div);
@@ -386,7 +396,7 @@ let lastSlavesList = [];
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const ws = new WebSocket(`${proto}://${location.host}/ws${TOKEN ? '?token=' + TOKEN : ''}`);
   ws.onopen = () => { connEl.textContent = '● ' + sysmonI18n.t('dash.conn.online'); connEl.className = 'conn on'; ws.send(JSON.stringify({ type: 'subscribe' })); };
   ws.onmessage = e => { try { render(JSON.parse(e.data)); } catch { /* ignore */ } };
   ws.onclose = () => { connEl.textContent = '● ' + sysmonI18n.t('dash.conn.offline') + ' — retrying…'; connEl.className = 'conn off'; setTimeout(connect, 3000); };

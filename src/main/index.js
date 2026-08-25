@@ -7,6 +7,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require(
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const config = require('./config');
 const logger = require('./logger');
 const history = require('./history');
@@ -302,7 +303,7 @@ function rebuildTrayMenu() {
     { label: 'Show widget', click: () => { if (widgetWin) widgetWin.show(); } },
     { label: 'Settings…', click: openSettings },
     ...(cfg.mode === 'master' && cfg.webAccess ? [
-      { label: 'Open web dashboard', click: () => shell.openExternal(`http://localhost:${cfg.port}`) }
+      { label: 'Open web dashboard', click: () => shell.openExternal(`http://localhost:${cfg.port}/?token=${cfg.authToken}`) }
     ] : []),
     { type: 'separator' },
     { label: 'Mode: ' + cfg.mode, enabled: false },
@@ -401,7 +402,16 @@ ipcMain.handle('slaves:set', (_e, id, action) => {
 });
 ipcMain.handle('open:dashboard', (_e) => {
   const cfg = config.load();
-  shell.openExternal(`http://localhost:${cfg.port}`);
+  shell.openExternal(`http://localhost:${cfg.port}/?token=${cfg.authToken}`);
+});
+// Régénère le jeton d'accès web (l'ancien devient invalide ; tous les clients
+// WebSocket sont déconnectés et devront se reconnecter avec le nouveau jeton)
+ipcMain.handle('auth:regenerate', () => {
+  const token = crypto.randomBytes(24).toString('hex');
+  config.set({ authToken: token });
+  masterServer.disconnectClients();
+  logger.info('main', 'web access token regenerated');
+  return token;
 });
 ipcMain.handle('open:settings', () => openSettings());
 ipcMain.handle('sysinfo:refresh', async () => {

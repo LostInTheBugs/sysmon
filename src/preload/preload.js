@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('sysmon', {
   setConfig: patch => ipcRenderer.invoke('config:set', patch),
   listSlaves: () => ipcRenderer.invoke('slaves:list'),
   setSlave: (id, action) => ipcRenderer.invoke('slaves:set', id, action),
+  authRegenerate: () => ipcRenderer.invoke('auth:regenerate'),
   openDashboard: () => ipcRenderer.invoke('open:dashboard'),
   openSettings: () => ipcRenderer.invoke('open:settings'),
   refresh: () => ipcRenderer.invoke('sysinfo:refresh'),
