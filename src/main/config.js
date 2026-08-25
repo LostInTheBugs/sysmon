@@ -16,7 +16,7 @@ const DEFAULTS = {
   pushIntervalMs: 2000,
   theme: 'dark',        // 'dark' | 'light' | 'amoled' | 'compact'
   accent: '#4fc3f7',    // couleur d'accent (widget, paramètres, dashboard)
-  logLevel: 'debug',    // 'debug' | 'info' | 'warn' | 'error'
+  logLevel: 'info',     // 'debug' | 'info' | 'warn' | 'error'
   chartMode: 'instant', // 'instant' | 'history' (courbes)
   historyEnabled: true,
   historyMinutes: 30,   // fenêtre de l'historique en mémoire
@@ -71,7 +71,7 @@ function load() {
   cache.syncMode = ['push', 'pull', 'both'].includes(cache.syncMode) ? cache.syncMode : 'push';
   cache.chartMode = ['instant', 'history'].includes(cache.chartMode) ? cache.chartMode : 'instant';
   cache.language = ['auto', 'fr', 'en'].includes(cache.language) ? cache.language : 'auto';
-  cache.logLevel = ['debug', 'info', 'warn', 'error'].includes(cache.logLevel) ? cache.logLevel : 'debug';
+  cache.logLevel = ['debug', 'info', 'warn', 'error'].includes(cache.logLevel) ? cache.logLevel : 'info';
   cache.theme = ['dark', 'light', 'amoled', 'compact'].includes(cache.theme) ? cache.theme : 'dark';
   // barMode : migration depuis l'ancien format {metric:'cpu'} → {metrics:[...]}
   const bar = cache.barMode || {};

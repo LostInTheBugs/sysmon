@@ -506,3 +506,8 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   // L'appli vit dans le tray — ne pas quitter
 });
+
+// Vider la file d'écriture du journal avant de quitter (pas de perte de logs)
+app.on('before-quit', () => {
+  logger.flush();
+});
