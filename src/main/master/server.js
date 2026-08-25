@@ -363,11 +363,14 @@ function start({ getSnapshot: gs, onChange }) {
     }
     }
     // --- Dashboard web (authentifié) ---
+    // Le jeton est lu à CHAQUE requête (config.load()) : après auth:regenerate,
+    // cfg.authToken figé au start() serait périmé → boucle 401 sur le dashboard
+    const authToken = config.load().authToken;
     // ?token= valide → poser le cookie HttpOnly puis rediriger sans le jeton
     // dans la barre d'adresse. Les sous-requêtes (css/js/api) passent ensuite
     // par le cookie.
-    if (url.pathname === '/' && url.searchParams.get('token') && tokenMatches(url.searchParams.get('token'), cfg.authToken)) {
-      res.writeHead(302, { Location: '/', 'Set-Cookie': `sysmon_token=${cfg.authToken}; HttpOnly; SameSite=Strict; Path=/` });
+    if (url.pathname === '/' && url.searchParams.get('token') && tokenMatches(url.searchParams.get('token'), authToken)) {
+      res.writeHead(302, { Location: '/', 'Set-Cookie': `sysmon_token=${authToken}; HttpOnly; SameSite=Strict; Path=/` });
       res.end();
       return;
     }
@@ -388,7 +391,7 @@ function start({ getSnapshot: gs, onChange }) {
     // Le dashboard connaît le jeton (WS + appels API) : injecté dans un <meta>
     // (pas de script inline — CSP script-src 'self').
     if (ext === '.html') {
-      const html = fs.readFileSync(full, 'utf8').replace('<head>', `<head><meta name="sysmon-token" content="${cfg.authToken}">`);
+      const html = fs.readFileSync(full, 'utf8').replace('<head>', `<head><meta name="sysmon-token" content="${authToken}">`);
       res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', ...SECURITY_HEADERS });
       res.end(html);
       return;

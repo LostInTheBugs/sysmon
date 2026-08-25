@@ -196,9 +196,25 @@ async function run() {
       loopback = resp.status === 200;
     } catch { /* ignore */ }
     check('bindAddress=127.0.0.1 → joignable en loopback', loopback);
+
+    // --- P3 : régénération du jeton — le dashboard doit suivre le NOUVEAU
+    // jeton (la redirection, le Set-Cookie et le <meta> lisaient cfg.authToken
+    // figé au start() → boucle 401 après auth:regenerate) ---
+    const TOKEN2 = 'regenerated-token-abcdef0123456789';
+    config.set({ authToken: TOKEN2 });
+    r = await fetch(BASE + '/?token=' + TOKEN2, { redirect: 'manual' });
+    check('après régénération → /?token=NOUVEAU → 302', r.status === 302, 'got ' + r.status);
+    const setCookie2 = r.headers.get('set-cookie') || '';
+    check('Set-Cookie porte le NOUVEAU jeton', setCookie2.includes(TOKEN2), setCookie2);
+    r = await fetch(BASE + '/', { headers: { Cookie: 'sysmon_token=' + TOKEN2 } });
+    const html2 = await r.text();
+    check('dashboard avec nouveau cookie → 200 + meta NOUVEAU jeton', r.status === 200 && html2.includes(TOKEN2), 'status ' + r.status + (html2.includes('sysmon-token') ? '' : ' meta absent'));
+    r = await fetch(BASE + '/api/logs', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    check('ancien jeton → 401 après régénération', r.status === 401, 'got ' + r.status);
+    config.set({ authToken: TOKEN });
     master.stop();
   } else {
-    console.log('  (aucune IP LAN — check bindAddress ignoré)');
+    console.log('  (aucune IP LAN — checks bindAddress ignorés)');
   }
 
   master.stop();
